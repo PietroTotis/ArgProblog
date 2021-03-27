@@ -28,7 +28,7 @@ from __future__ import print_function
 from .logic import Term
 from .core import transform
 from .util import Timer
-from .formula import LogicFormula, LogicDAG
+from .formula import LogicFormula, LogicDAG, LogicGraph
 
 from collections import defaultdict
 import logging
@@ -36,6 +36,7 @@ import logging
 cycle_var_prefix = "problog_cv_"
 
 # noinspection PyUnusedLocal
+@transform(LogicFormula, LogicGraph)
 @transform(LogicFormula, LogicDAG)
 def break_cycles(source, target, translation=None, **kwdargs):
     """Break cycles in the source logic formula.

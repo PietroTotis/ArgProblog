@@ -29,7 +29,7 @@ from collections import defaultdict
 
 from .program import LogicProgram
 from .logic import *
-from .formula import LogicFormula
+from .formula import LogicFormula, LogicGraph
 from .engine_unify import *
 
 from .core import transform
@@ -38,6 +38,18 @@ from .util import Timer
 
 from subprocess import CalledProcessError
 
+
+@transform(LogicProgram, LogicGraph)
+def ground_for_asp(model, target=None, grounder=None, **kwdargs):
+    """Ground a given model.
+
+    :param model: logic program to ground
+    :type model: LogicProgram
+    :return: the ground program
+    :rtype: LogicFormula
+    """
+    from .ground_gringo import ground_gringo
+    return ground_gringo(model, target, **kwdargs)
 
 @transform(LogicProgram, LogicFormula)
 def ground(model, target=None, grounder=None, **kwdargs):

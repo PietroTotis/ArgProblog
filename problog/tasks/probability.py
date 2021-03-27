@@ -133,6 +133,9 @@ def execute(
             else:
                 profiler = None
 
+            if kwdargs['asp']:
+                kwdargs.update({'keep_all':True, 'avoid_name_clash':True})
+
             engine = DefaultEngine(**kwdargs)
             db = engine.prepare(model)
             db_semiring = db.get_data("semiring")
@@ -325,6 +328,8 @@ def argparser():
         default=argparse.SUPPRESS,
         help=argparse.SUPPRESS,
     )
+
+    parser.add_argument('--asp', action='store_true', help='use stable models semantics')
 
     # SDD garbage collection
     sdd_auto_gc_group = parser.add_mutually_exclusive_group()

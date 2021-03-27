@@ -24,7 +24,7 @@ Provides access to CNF and weighted CNF.
 """
 from __future__ import print_function
 
-from .formula import BaseFormula, LogicDAG
+from .formula import BaseFormula, LogicDAG, LogicGraph
 
 from .core import transform
 from .util import Timer
@@ -393,3 +393,85 @@ def clarks_completion(source, destination, force_atoms=False, **kwdargs):
             destination.add_name(n, i, l)
 
         return destination
+
+
+class CNF_ASP(CNF):
+
+    def __init__(self, **kwdargs):
+        CNF.__init__(self, **kwdargs)
+
+# noinspection PyUnusedLocal
+@transform(LogicGraph, CNF_ASP)
+def cnf_dsharp_asp(source, destination, force_atoms=False, **kwdargs):
+    
+    source.compute_sccs()
+    max_id = 0
+    
+    # Add scc info
+    scc_keys = set(source.scc.values())
+    scc_stmt = f"s {len(scc_keys)}"
+    destination.add_comment(scc_stmt)
+
+    # Add founded vars
+    for f_var in source.founded_vars:
+        f_stmt = f"f {f_var} {source.scc[f_var]}"
+        destination.add_comment(f_stmt)
+
+    # Check if there is some extra body id in the commented rules
+    # that does not end up in the usual cnf clauses (needed for fake vars)
+    for index, node, nodetype in source:
+        if nodetype == 'disj':
+            for max_lit, r in source.get_rules_cnf(index):
+                destination.add_comment(r)   
+                if max_lit>max_id:
+                    max_id = max_lit
+    
+    # Add evidence: must be propagated
+    # for e in source.evidence_all():
+    #     destination.add_comment(f"e {e[1]} {e[2]}")
+
+    with Timer('Clark\'s completion'):
+        # Each rule in the source formula will correspond to an atom.
+        num_atoms = len(source)
+
+        # Copy weight information.
+        destination.set_weights(source.get_weights())
+
+        # Add atoms.
+        for i in range(0, num_atoms):
+            destination.add_atom(i+1, force=force_atoms)
+
+        # Complete other nodes
+        # Note: assumes negation is encoded as negative number.
+        for index, node, nodetype in source:
+            if nodetype == 'conj':
+                destination.add_clause(index, list(map(lambda x: -x, node.children)))
+                for c in node.children:
+                    destination.add_clause(-index, [c])
+            elif nodetype == 'disj':
+                destination.add_clause(-index, node.children)
+                for c in node.children:
+                    destination.add_clause(index, [-c])
+            elif nodetype == 'atom':
+                pass
+            else:
+                raise ValueError("Unexpected node type: '%s'" % nodetype)
+
+        # Copy constraints.
+        for c in source.constraints():
+            destination.add_constraint(c)
+            
+        # Copy node names.
+        for n, i, l in source.get_names_with_label():
+            destination.add_name(n, i, l)
+        
+        # Fake vars (required by dsharp with unfounded)
+        # (only if there are sccs/founded vars/rules)
+        if len(source.scc) > 0:
+            n = max(destination._atomcount, max_id) +1
+            destination.add_atom(n, force=force_atoms)
+            destination.add_atom(n+1, force=force_atoms)
+            destination.add_clause(-n,[n+1])
+            destination.add_clause(-n,[-n-1])
+            destination.add_clause(n,[n+1])
+    return destination

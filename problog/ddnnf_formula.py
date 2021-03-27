@@ -32,10 +32,11 @@ from . import system_info
 from .evaluator import Evaluator, EvaluatableDSP
 from .errors import InconsistentEvidenceError
 from .formula import LogicDAG
-from .cnf_formula import CNF
+from .cnf_formula import CNF, CNF_ASP
 from .core import transform
 from .errors import CompilationError
 from .util import Timer, subprocess_check_call
+from .logic import Constant
 
 
 class DSharpError(CompilationError):
@@ -67,6 +68,10 @@ class SimpleDDNNFEvaluator(Evaluator):
     def __init__(self, formula, semiring, weights=None, **kwargs):
         Evaluator.__init__(self, formula, semiring, weights, **kwargs)
         self.cache_intermediate = {}  # weights of intermediate nodes
+        self.keytotal = {}
+        self.keyworlds = {}
+        self.multi_sm = self.multi_stable_models()
+        print("Warning: floating point instability is a possible known bug")
 
     def _initialize(self, with_evidence=True):
         self.weights.clear()
@@ -115,8 +120,10 @@ class SimpleDDNNFEvaluator(Evaluator):
         elif node is None:
             result = self.semiring.zero()
         else:
-            p = self._get_weight(abs(node))
-            n = self._get_weight(-abs(node))
+            ps = self._get_weight(abs(node))
+            p = self._aggregate_weights(ps)
+            ns = self._get_weight(-abs(node))
+            n = self._aggregate_weights(ns)
             self._set_value(abs(node), (node > 0))
             result = self.get_root_weight()
             self._reset_value(abs(node), p, n)
@@ -133,7 +140,8 @@ class SimpleDDNNFEvaluator(Evaluator):
         :return: The WMC of the root of this formula (WMC of node len(self.formula)), multiplied with weight of True
         (self.weights.get(0)).
         """
-        result = self._get_weight(len(self.formula))
+        weights = self._get_weight(len(self.formula))
+        result = self._aggregate_weights(weights)
         return (
             self.semiring.times(result, self.weights.get(0)[0])
             if self.weights.get(0) is not None
@@ -142,14 +150,14 @@ class SimpleDDNNFEvaluator(Evaluator):
 
     def _get_weight(self, index):
         if index == 0:
-            return self.semiring.one()
+            return [self.semiring.one()]
         elif index is None:
-            return self.semiring.zero()
+            return [self.semiring.zero()]
         else:
             abs_index = abs(index)
             w = self.weights.get(abs_index)  # Leaf nodes
             if w is not None:
-                return w[index < 0]
+                return [w[index < 0]]
             w = self.cache_intermediate.get(abs_index)  # Intermediate nodes
             if w is None:
                 w = self._calculate_weight(index)
@@ -184,11 +192,19 @@ class SimpleDDNNFEvaluator(Evaluator):
         :param value: value
         """
         if value:
-            pos = self._get_weight(index)
+            poss = self._get_weight(index)
+            pos = self._aggregate_weights(poss)
             self.set_weight(index, pos, self.semiring.zero())
         else:
-            neg = self._get_weight(-index)
+            negs = self._get_weight(-index)
+            neg = self._aggregate_weights(negs)
             self.set_weight(index, self.semiring.zero(), neg)
+
+    def _aggregate_weights(self, weights):
+        result = self.semiring.zero()
+        for w in weights:
+            result = self.semiring.plus(result, w)
+        return result
 
     def _calculate_weight(self, key):
         assert key != 0
@@ -199,23 +215,88 @@ class SimpleDDNNFEvaluator(Evaluator):
         ntype = type(node).__name__
 
         if ntype == "atom":
-            return self.semiring.one()
+            return [self.semiring.one()]
         else:
             assert key > 0
             childprobs = [self._get_weight(c) for c in node.children]
             if ntype == "conj":
-                p = self.semiring.one()
-                for c in childprobs:
-                    p = self.semiring.times(p, c)
-                return p
+                w_conj = list(self.wproduct(childprobs))
+                n_children = len(w_conj)
+                if key in self.keyworlds:
+                    worlds = self.keyworlds[key]
+                    for c in range(0, n_children):
+                        pw = frozenset(worlds[c])
+                        n = self.multi_sm.get(pw,1)
+                        if n!=1 and not self.semiring.is_zero(w_conj[c]):
+                            norm = self.semiring.value(1/n)
+                            w_conj[c] = self.semiring.times(w_conj[c],norm)
+                return w_conj
             elif ntype == "disj":
-                p = self.semiring.zero()
-                for c in childprobs:
-                    p = self.semiring.plus(p, c)
-                return p
+                cp_disj = []
+                for weights in childprobs:
+                    cp_disj += [w for w in weights if not self.semiring.is_zero(w)]
+                return cp_disj
             else:
                 raise TypeError("Unexpected node type: '%s'." % ntype)
 
+    def get_worlds(self, key, n_choices):
+
+        if key == 0 or key is None:
+            return [[]]
+
+        node = self.formula.get_node(abs(key))
+        ntype = type(node).__name__
+
+        if ntype == 'atom':
+            if node.probability != True: #?
+                return [[key]]
+            else:
+                return [[]]
+        else:
+            assert key > 0
+            childworlds = [self.get_worlds(c, n_choices) for c in node.children]
+            # print("cws:", key, childworlds)
+            if ntype == 'conj':
+                cw_conj = list(self.product(childworlds))
+                # print("cj:", key,  cw_conj)
+                if len(cw_conj) > 0 and len(cw_conj[0]) == n_choices:
+                    self.keyworlds[key] = [frozenset(w) for w in cw_conj]
+                return cw_conj
+            elif ntype == 'disj':
+                disj = []
+                for cws in childworlds:
+                    disj += [w for w in cws if len(w) != n_choices]
+                # disj = list(k for k,_ in itertools.groupby(disj))
+                # print("dws:", disj)
+                return disj
+            else:
+                raise TypeError("Unexpected node type: '%s'." % ntype)
+
+    def product(self, ar_list):
+        if not ar_list:
+            yield []
+        else:
+            for a in ar_list[0]:
+                for prod in self.product(ar_list[1:]):
+                    yield a+prod
+    
+    def wproduct(self, ar_list):
+        if not ar_list:
+            yield self.semiring.one()
+        else:
+            for w in ar_list[0]:
+                for prod in self.wproduct(ar_list[1:]):
+                    yield self.semiring.times(w, prod)
+
+    def multi_stable_models(self):
+        from collections import Counter
+        n_choices = len([w for w in self.formula.get_weights().values() if isinstance(w,Constant)])
+        root = len(self.formula._nodes)
+        self.get_worlds(root, n_choices)
+        worlds = [w for ws in self.keyworlds.values() for w in ws if len(w)==n_choices]
+        counter = Counter(worlds)
+        multi_models = {k: c for k, c in counter.items() if c>1}
+        return multi_models
 
 class Compiler(object):
     """Interface to CNF to d-DNNF compiler tool."""
@@ -281,7 +362,7 @@ if system_info.get("c2d", False):
 
 
 # noinspection PyUnusedLocal
-@transform(CNF, DDNNF)
+# @transform(CNF, DDNNF)
 def _compile_with_dsharp(cnf, nnf=None, smooth=True, **kwdargs):
     result = None
     with Timer("DSharp compilation"):
@@ -313,6 +394,39 @@ def _compile_with_dsharp(cnf, nnf=None, smooth=True, **kwdargs):
 
 
 Compiler.add("dsharp", _compile_with_dsharp)
+
+# noinspection PyUnusedLocal
+@transform(CNF_ASP, DDNNF)
+def _compile_with_dsharp_asp(cnf, nnf=None, smooth=True, **kwdargs):
+    result = None
+    with Timer('DSharp compilation'):
+        fd1, cnf_file = tempfile.mkstemp('.cnf')
+        fd2, nnf_file = tempfile.mkstemp('.nnf')
+        os.close(fd1)
+        os.close(fd2)
+        if smooth:
+            smoothl = ['-smoothNNF']
+        else:
+            smoothl = ['']
+        cmd = ['dsharp_with_unfounded', '-noIBCP', '-evidencePropagated', '-noPP', '-Fnnf', nnf_file, '-smoothNNF', '-disableAllLits', cnf_file]
+
+        try:
+            result = _compile(cnf, cmd, cnf_file, nnf_file)
+        except subprocess.CalledProcessError:
+            raise DSharpError()
+
+        try:
+            os.remove(cnf_file)
+        except OSError:
+            pass
+        try:
+            os.remove(nnf_file)
+        except OSError:
+            pass
+
+    return result
+
+Compiler.add('dsharp_asp', _compile_with_dsharp_asp)
 
 
 def _compile(cnf, cmd, cnf_file, nnf_file):

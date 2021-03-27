@@ -1730,6 +1730,169 @@ class LogicDAG(LogicFormula):
         LogicFormula.__init__(self, auto_compact, **kwdargs)
 
 
+    #######################
+    ###   DSHARP ASP   ####
+    #######################
+
+class LogicGraph(LogicFormula):
+
+    def __init__(self, auto_compact=True, **kwdargs):
+        LogicFormula.__init__(self, auto_compact, **kwdargs)
+        self.founded_vars = set()
+        self.scc = {}
+
+    def get_founded_by_name(self, name):
+        for index, node, nodetype in self:
+            if node.name == name and not hasattr(node, 'probability'):
+                return index
+        raise KeyError(name)
+
+    def is_anon_conj(self, key):
+        if key > 0:
+            node = self.get_node(key)
+            if isinstance(node,conj):
+                if not self._is_valid_name(node.name):
+                    return True
+        return False
+
+    def get_rule_cnf(self, head, body, body_id):
+        """
+        recovers from internal format a smodels-like descriprion of the clauses:
+        r [scc id] [head id] [head] [body id] [pos body ids] 0 [neg body ids]
+        """
+        b_pos = [lit for lit in body if lit>0]
+        b_neg = [lit for lit in body if lit<0]
+        b_neg_abs = list(map(abs,b_neg))
+        max_lit = max(b_pos+b_neg_abs+[body_id])
+        b_pos_stmt = " ".join(list(map(str,b_pos)))
+        b_neg_stmt = " ".join(list(map(str,b_neg_abs)))
+        stmt = " ".join(list(map(str,["r", self.scc[body_id], head, body_id])))
+        if len(b_pos) > 0:
+            stmt += f" {b_pos_stmt}"
+        stmt += " 0"
+        if len(b_neg) > 0:
+            stmt += f" {b_neg_stmt}"
+        return max_lit, stmt
+
+    def get_rules_cnf(self, key):
+        """
+        if len(body) is >1 then new id, otherwise same id of the literal
+        """
+        rules = []
+        node = self.get_node(key)
+        if isinstance(node, conj):
+            rules.append(self.get_rule_cnf(key, node.children, key))
+        if isinstance(node, disj):
+            for c in node.children:
+                if self.is_anon_conj(c):
+                    body = self._unroll_conj(self.get_node(c))
+                else:
+                    body = [c]
+                rules.append(self.get_rule_cnf(key, body, c))
+        return rules
+
+    def replace_non_anon_conj(self):
+        """
+        add an extra rule "name :- conjunction" for conjunctions corresponding to 
+        an atom, so that we take that into account when generating the sccs, founded
+        vars and rules for the cnf (needed for ADs and likely for other cases)
+        """
+        for index, node, nodetype in self:
+            name = node.name
+            if nodetype == "conj" and name is not None:
+                anon_node = conj(node.children, None)
+                self._update(index, anon_node)
+                self.add_or((index,), name=name)#, placeholder=True)
+        
+    def compute_sccs(self):
+        self.founded_vars = set()
+        self.scc = {}
+        self.body_map = {}
+        self.body_succ = {}
+        self.curr_idx = 0
+        self.scc_count = 0
+        self.nodes_in_scc = []
+        self.node_root = {}
+        self.node_idx = {}
+        self.in_stack = set()
+        self.stack = []
+        self.body_name = {}
+        self.rules = {}
+        self.rules_for_head = {}
+        self.body_ids = []
+
+        self.replace_non_anon_conj()
+        e_ids =[e[1] for e in self.evidence_all()]
+        self.propagate(e_ids) # evidence must be propagated
+
+        for index, node, nodetype in self:
+            if node.name is not None and not hasattr(node, 'probability'):
+                self.founded_vars.add(index)
+            if nodetype == "disj":
+                if len(node.children) >1:
+                    for c in node.children:
+                        if self.is_anon_conj(c):
+                            self.body_ids.append(c)
+
+        for v in self.founded_vars:
+            if (not (v in self.node_idx)):
+                self.strong_connect(v)
+        
+        for i, n, nodetype in self:
+            if nodetype == "disj":
+                for c in n.children:
+                    if c not in self.node_idx:
+                        self.strong_connect(c)
+        
+    def add_to_stack(self, node) :
+        self.stack.append(node)
+        self.in_stack.add(node)
+        
+    def pop_from_stack(self) :
+        node = self.stack.pop()
+        self.in_stack.remove(node)
+        return node
+            
+    def strong_connect(self, node) :
+        self.node_idx[node] = self.curr_idx
+        self.node_root[node] = self.curr_idx
+        self.curr_idx += 1
+        self.add_to_stack(node)
+        
+        succs = self.get_successors(node)
+        
+        for s in succs :
+            if (not (s in self.node_idx)) :
+                self.strong_connect(s)
+                self.node_root[node] = min(self.node_root[s], self.node_root[node])
+            elif (s in self.in_stack) :
+                self.node_root[node] = min(self.node_idx[s], self.node_root[node])
+        if (self.node_root[node] == self.node_idx[node]) :
+            nodes = []
+            scc_num = len(self.nodes_in_scc)
+            while (self.stack):
+                b = self.pop_from_stack()
+                nodes.append(b)
+                self.scc[b] = scc_num
+                if (b == node):
+                    break
+            self.nodes_in_scc.append(nodes)
+
+    def get_successors(self, n):
+        if n < 0:
+            return []   
+        node = self.get_node(n)
+        if isinstance(node, atom):
+            lits = []
+        elif isinstance(node, disj):
+            lits = node.children
+        else:
+            lits = self._unroll_conj(node)
+        succs = [c for c in lits if c in self.founded_vars or c in self.body_ids]
+        return succs
+
+
+
 class LogicNNF(LogicDAG, Evaluatable):
     """A propositional formula in NNF form (i.e. only negation on facts)."""
 
