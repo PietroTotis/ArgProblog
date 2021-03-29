@@ -71,7 +71,6 @@ class SimpleDDNNFEvaluator(Evaluator):
         self.keytotal = {}
         self.keyworlds = {}
         self.multi_sm = self.multi_stable_models()
-        print("Warning: floating point instability is a possible known bug")
 
     def _initialize(self, with_evidence=True):
         self.weights.clear()
