@@ -121,7 +121,8 @@ def evidence_clause_to_gringo(cl):
     return special_clause_to_gringo(cl, args)
 
 def evidence_fact_to_gringo(sf):
-    args = check_evidence(sf)
+    # args = check_evidence(sf)
+    args = [sf.args[0]]
     return special_fact_to_gringo(sf, args)
 
 def or_to_gringo(stmt, line):
