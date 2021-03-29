@@ -39,7 +39,7 @@ from .util import Timer
 from subprocess import CalledProcessError
 
 
-@transform(LogicProgram, LogicGraph)
+@transform(LogicProgram, LogicFormula)
 def ground_for_asp(model, target=None, grounder=None, **kwdargs):
     """Ground a given model.
 

@@ -26,7 +26,7 @@ from __future__ import print_function
 import tempfile
 import os
 import subprocess
-from collections import defaultdict
+from collections import defaultdict, Counter
 
 from . import system_info
 from .evaluator import Evaluator, EvaluatableDSP
@@ -289,7 +289,6 @@ class SimpleDDNNFEvaluator(Evaluator):
                     yield self.semiring.times(w, prod)
 
     def multi_stable_models(self):
-        from collections import Counter
         n_choices = len([w for w in self.formula.get_weights().values() if isinstance(w,Constant)])
         root = len(self.formula._nodes)
         self.get_worlds(root, n_choices)
@@ -362,7 +361,7 @@ if system_info.get("c2d", False):
 
 
 # noinspection PyUnusedLocal
-# @transform(CNF, DDNNF)
+@transform(CNF, DDNNF)
 def _compile_with_dsharp(cnf, nnf=None, smooth=True, **kwdargs):
     result = None
     with Timer("DSharp compilation"):
