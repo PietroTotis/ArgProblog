@@ -269,7 +269,7 @@ class SmodelsParser:
         self.annotated_disjunctions = defaultdict(int)
         self.annotated_disjunctions_with_prob = []
         self.probs = defaultdict(int)
-        self.heads = set()
+        self.heads = []
 
         self.new_var = 0
 
@@ -356,7 +356,8 @@ class SmodelsParser:
         head_names = [self.lookup_name(h_id) for h_id in heads]
         head_terms = list(map(Term.from_string, head_names))       #
         for h in head_terms:
-            self.heads.add(h.with_probability())
+            if h not in self.heads:
+                self.heads.append(h.with_probability())
         # gringo creates a new rule for ads bodies longer than 1
         rule_id = raw_rule[-1]
         if rule_id in self.facts: # only aux_line
@@ -397,7 +398,8 @@ class SmodelsParser:
     def parse_base_rule(self, head, b_pos_terms, b_neg_terms):
         name = self.lookup_name(head)
         h = Term.from_string(name)
-        self.heads.add(h.with_probability())
+        if h not in self.heads:
+            self.heads.append(h.with_probability())
         body = b_pos_terms + b_neg_terms
         if len(body) == 1:
             r = Clause(h,body[0])

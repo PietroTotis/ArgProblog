@@ -40,6 +40,7 @@ from subprocess import CalledProcessError
 
 
 @transform(LogicProgram, LogicFormula)
+# @transform(LogicProgram, LogicGraph)
 def ground_for_asp(model, target=None, grounder=None, **kwdargs):
     """Ground a given model.
 

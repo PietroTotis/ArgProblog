@@ -71,6 +71,7 @@ class SimpleDDNNFEvaluator(Evaluator):
         self.keytotal = {}
         self.keyworlds = {}
         self.multi_sm = self.multi_stable_models()
+        # print("Warning: some floating point instability is a known possible bug")
 
     def _initialize(self, with_evidence=True):
         self.weights.clear()
@@ -360,7 +361,8 @@ if system_info.get("c2d", False):
 
 
 # noinspection PyUnusedLocal
-@transform(CNF, DDNNF)
+# @transform(CNF, DDNNF)
+@transform(CNF_ASP, DDNNF)
 def _compile_with_dsharp(cnf, nnf=None, smooth=True, **kwdargs):
     result = None
     with Timer("DSharp compilation"):
@@ -394,7 +396,8 @@ def _compile_with_dsharp(cnf, nnf=None, smooth=True, **kwdargs):
 Compiler.add("dsharp", _compile_with_dsharp)
 
 # noinspection PyUnusedLocal
-@transform(CNF_ASP, DDNNF)
+# @transform(CNF, DDNNF)
+# @transform(CNF_ASP, DDNNF)
 def _compile_with_dsharp_asp(cnf, nnf=None, smooth=True, **kwdargs):
     result = None
     with Timer('DSharp compilation'):
