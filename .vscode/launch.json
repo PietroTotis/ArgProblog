@@ -1,0 +1,22 @@
+{
+    // Use IntelliSense to learn about possible attributes.
+    // Hover to view descriptions of existing attributes.
+    // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+    "version": "0.2.0",
+    "configurations": [
+
+        {
+            "name": "ProbLog",
+            "type": "python",
+            "request": "launch",
+            "program": "problog-cli.py",
+            "console": "integratedTerminal",
+            // "args" : ["--nologspace","/media/windows/Users/pietr/Desktop/PhD/Problogs/ASP-Problog/test/smokers.pl"]
+            // "args" : ["--nologspace","/media/windows/Users/pietr/Desktop/PhD/Problogs/ASP-Problog/test/args.pl"]
+            "args" : ["--nologspace", "/media/windows/Users/pietr/Desktop/PhD/Problogs/ASP-Problog/test/simple_neg_cycle/neg/neg.pl"]
+            // "args" : ["ground","/media/windows/Users/pietr/Desktop/PhD/Problogs/ASP-Problog/test/bug/2.pl"]
+            // "args" : ["--nologspace","/media/windows/Users/pietr/Desktop/PhD/Problogs/ASP-Problog/test/bug/2.pl"]
+            // "args" : ["--nologspace","/media/windows/Users/pietr/Desktop/PhD/Problogs/ASP-Problog/test/hard_neg_cycle.pl"]
+        }
+    ]
+}

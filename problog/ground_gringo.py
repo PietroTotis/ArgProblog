@@ -5,13 +5,13 @@ import os
 
 from .util import subprocess_check_output, mktempfile, Timer
 from logging import getLogger
-from .logic import AnnotatedDisjunction, list2term, Term, Clause, Or, Constant, And, Not
+from .logic import AnnotatedDisjunction, term2str, Term, Clause, Or, Constant, And, Not
 from collections import defaultdict, deque
 from subprocess import CalledProcessError
 from .errors import GroundingError
-from .engine import UnknownClause, NonGroundProbabilisticClause
-from .program import LogicProgram, SimpleProgram
-from .formula import LogicGraph, disj, atom, conj
+from .engine import UnknownClause
+from .program import SimpleProgram
+from .formula import LogicGraph
 from .constraint import ConstraintAD
 
 # add exception for unsupported elements of the language (lists, imports...)
@@ -67,7 +67,6 @@ def ground_gringo(model, target=None, queries=None, evidence=None, propagate_evi
         # for s in lf:
         #     print(s)
         lf = gop.smodels2internal(**kwdargs)
-        # print(lf)
         return lf
 
 def annotated_disjunction_to_gringo(ad, line):
@@ -283,7 +282,8 @@ class SmodelsParser:
         name = a.with_probability()
         if a in self.heads:
             id = logic_graph.get_node_by_name(name)
-            atom_id = logic_graph.add_atom(name, a.probability, name=name)
+            label = Term(term2str(name)+"_fact")
+            atom_id = logic_graph.add_atom(name, a.probability, name=label)
             logic_graph.add_disjunct(id, atom_id)
             return atom_id
         else:
@@ -588,7 +588,6 @@ class SmodelsParser:
             for f_term in self.facts[f_id]:
                 name = f_term.with_probability()
                 id = self.add_atom(lf, f_term)
-                lf.add_name(name, id)
                             
         # Rules
         for r_id in self.base_rules:

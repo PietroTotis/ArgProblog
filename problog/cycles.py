@@ -36,7 +36,7 @@ import logging
 cycle_var_prefix = "problog_cv_"
 
 # noinspection PyUnusedLocal
-@transform(LogicFormula, LogicGraph)
+# @transform(LogicFormula, LogicGraph)
 # @transform(LogicFormula, LogicDAG)
 def break_cycles(source, target, translation=None, **kwdargs):
     """Break cycles in the source logic formula.

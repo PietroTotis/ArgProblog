@@ -39,9 +39,9 @@ from .util import Timer
 from subprocess import CalledProcessError
 
 
-@transform(LogicProgram, LogicFormula)
-# @transform(LogicProgram, LogicGraph)
-def ground_for_asp(model, target=None, grounder=None, **kwdargs):
+# @transform(LogicProgram, LogicFormula)
+@transform(LogicProgram, LogicGraph)
+def ground(model, target=None, grounder=None, **kwdargs):
     """Ground a given model.
 
     :param model: logic program to ground
@@ -52,21 +52,21 @@ def ground_for_asp(model, target=None, grounder=None, **kwdargs):
     from .ground_gringo import ground_gringo
     return ground_gringo(model, target, **kwdargs)
 
-@transform(LogicProgram, LogicFormula)
-def ground(model, target=None, grounder=None, **kwdargs):
-    """Ground a given model.
+# @transform(LogicProgram, LogicFormula)
+# def ground(model, target=None, grounder=None, **kwdargs):
+#     """Ground a given model.
 
-    :param model: logic program to ground
-    :type model: LogicProgram
-    :return: the ground program
-    :rtype: LogicFormula
-    """
-    if grounder in ("yap", "yap_debug"):
-        from .ground_yap import ground_yap
+#     :param model: logic program to ground
+#     :type model: LogicProgram
+#     :return: the ground program
+#     :rtype: LogicFormula
+#     """
+#     if grounder in ("yap", "yap_debug"):
+#         from .ground_yap import ground_yap
 
-        return ground_yap(model, target, **kwdargs)
-    else:
-        return ground_default(model, target, **kwdargs)
+#         return ground_yap(model, target, **kwdargs)
+#     else:
+#         return ground_default(model, target, **kwdargs)
 
 
 @transform(LogicProgram, LogicFormula)

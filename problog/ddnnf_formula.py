@@ -70,8 +70,10 @@ class SimpleDDNNFEvaluator(Evaluator):
         self.cache_intermediate = {}  # weights of intermediate nodes
         self.keytotal = {}
         self.keyworlds = {}
-        self.multi_sm = self.multi_stable_models()
-        # print("Warning: some floating point instability is a known possible bug")
+        self.multi_sm = Counter()
+        # print(formula.to_dot())
+        print(formula)
+        self.multi_stable_models()
 
     def _initialize(self, with_evidence=True):
         self.weights.clear()
@@ -219,6 +221,7 @@ class SimpleDDNNFEvaluator(Evaluator):
         else:
             assert key > 0
             childprobs = [self._get_weight(c) for c in node.children]
+            # print(key, childprobs)
             if ntype == "conj":
                 w_conj = list(self.wproduct(childprobs))
                 n_children = len(w_conj)
@@ -234,13 +237,73 @@ class SimpleDDNNFEvaluator(Evaluator):
             elif ntype == "disj":
                 cp_disj = []
                 for weights in childprobs:
-                    cp_disj += [w for w in weights if not self.semiring.is_zero(w)]
+                    # cp_disj += [w for w in weights if not self.semiring.is_zero(w)]
+                    cp_disj += [w for w in weights]
                 return cp_disj
             else:
                 raise TypeError("Unexpected node type: '%s'." % ntype)
 
-    def get_worlds(self, key, n_choices):
 
+    # def get_paths(self, key, atom):
+    #     node = self.formula.get_node(abs(key))
+    #     ntype = type(node).__name__
+    #     if key == atom:
+    #         return 1
+    #     elif ntype == 'atom':
+    #         return 0
+    #     elif ntype == 'conj':
+    #         p_children = [self.get_paths(c, atom) for c in node.children]
+    #         prod = 1
+    #         for n in p_children:
+    #             if n>0:
+    #                 prod = prod*n 
+    #         return prod
+    #     else:
+    #         p_children = [self.get_paths(c, atom) for c in node.children]
+    #         return sum(p_children)
+
+    # visits
+    # def get_worlds(self, key, pws, n_choices):
+    #     if key == 0 or key is None:
+    #         return pws
+        
+    #     node = self.formula.get_node(abs(key))
+    #     ntype = type(node).__name__
+
+    #     if ntype == 'atom':
+    #         if node.probability != True: #?
+    #             return [[key] + pw for pw in pws]
+    #         else:
+    #             return pws
+    #     else:
+    #         assert key > 0
+                
+    #         if ntype == 'conj':
+    #             new_pws = pws
+    #             for c in node.children:
+    #                 new_pws = self.get_worlds(c, new_pws, n_choices)
+    #             partial = []
+    #             for pw in new_pws:
+    #                 if len(pw) == n_choices:
+    #                     fpw = frozenset(pw)
+    #                     if key in self.keyworlds:
+    #                         self.keyworlds[key].append(fpw)
+    #                     else:
+    #                         self.keyworlds[key] = [fpw]
+    #                     self.multi_sm[fpw] += 1
+    #                 else:
+    #                     partial.append(pw)
+    #             return partial
+    #         elif ntype == 'disj':
+    #             disj = []
+    #             for c in node.children:
+    #                 disj += self.get_worlds(c, pws, n_choices)
+    #             return disj
+    #         else:
+    #             raise TypeError("Unexpected node type: '%s'." % ntype)
+
+    # chi va piano va sano e lontano
+    def get_worlds(self, key, n_choices):
         if key == 0 or key is None:
             return [[]]
 
@@ -289,13 +352,25 @@ class SimpleDDNNFEvaluator(Evaluator):
                     yield self.semiring.times(w, prod)
 
     def multi_stable_models(self):
-        n_choices = len([w for w in self.formula.get_weights().values() if isinstance(w,Constant)])
+        weights = self.formula.get_weights()
+        choices = [key for key in weights if isinstance(weights[key],Constant)]
+        n_choices = len(choices)
         root = len(self.formula._nodes)
+        # n_choices = len([w for w in self.formula.get_weights().values() if isinstance(w,Constant)])
+        # print(choices)
+        # root = len(self.formula._nodes)
+        # paths = {key: self.get_paths(root, key) for key in choices}
+        # print(paths)
+
+        # self.multi_sm = Counter()
+        # pws = [[]]
+        # self.get_worlds(root, pws, n_choices)
+        # print(self.keyworlds)
+
         self.get_worlds(root, n_choices)
-        worlds = [w for ws in self.keyworlds.values() for w in ws if len(w)==n_choices]
-        counter = Counter(worlds)
-        multi_models = {k: c for k, c in counter.items() if c>1}
-        return multi_models
+        worlds = [w for ws in self.keyworlds.values() for w in ws]
+        self.multi_sm = Counter(worlds)
+        self.multi_sm = {k: c for k, c in self.multi_sm.items() if c>1}
 
 class Compiler(object):
     """Interface to CNF to d-DNNF compiler tool."""

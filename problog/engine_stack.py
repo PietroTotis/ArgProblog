@@ -265,10 +265,10 @@ class StackBasedEngine(ClauseDBEngine):
             exec_node = self.stack[current]
             if exec_node.on_cycle:
                 break
-            if isinstance(exec_node, EvalNot):
-                raise NegativeCycle(
-                    location=exec_node.database.lineno(exec_node.node.location)
-                )
+            # if isinstance(exec_node, EvalNot):
+            #     raise NegativeCycle(
+            #         location=exec_node.database.lineno(exec_node.node.location)
+            #     )
             current = exec_node.parent
 
     def _transform_act(self, action):
@@ -2342,8 +2342,8 @@ class EvalNot(EvalNode):
         actions += self.notifyComplete()
         return True, actions
 
-    def createCycle(self):
-        raise NegativeCycle(location=self.database.lineno(self.node.location))
+    # def createCycle(self):
+        # raise NegativeCycle(location=self.database.lineno(self.node.location))
 
     def node_str(self):  # pragma: no cover
         return ""

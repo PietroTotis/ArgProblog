@@ -433,6 +433,7 @@ def cnf_dsharp_asp(source, destination, force_atoms=False, **kwdargs):
     with Timer('Clark\'s completion'):
         # Each rule in the source formula will correspond to an atom.
         num_atoms = len(source)
+        print(source)
 
         # Copy weight information.
         destination.set_weights(source.get_weights())

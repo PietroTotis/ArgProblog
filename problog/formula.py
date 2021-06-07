@@ -1153,7 +1153,7 @@ class LogicFormula(BaseFormula):
 
             pl = problog.program.PrologFile(input_file)
             problog.formula.LogicFormula.create_from(pl, avoid_name_clash=True, keep_order=True, \
-label_all=True)
+            label_all=True)
             prologfile = gp.to_prolog()
 
         :return: Prolog program
