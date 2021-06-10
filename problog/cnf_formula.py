@@ -475,4 +475,6 @@ def cnf_dsharp_asp(source, destination, force_atoms=False, **kwdargs):
             destination.add_clause(-n,[n+1])
             destination.add_clause(-n,[-n-1])
             destination.add_clause(n,[n+1])
+        
+        # print(destination.to_dimacs())
     return destination

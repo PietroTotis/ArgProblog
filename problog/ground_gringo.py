@@ -61,11 +61,12 @@ def ground_gringo(model, target=None, queries=None, evidence=None, propagate_evi
             print(errmsg.decode('utf-8')) 
             raise err
         
-        # print(output)
+        print('\n'.join(converted) + '\n')
+        print(output)
         gop = SmodelsParser(output, queries, evidence)
         lf = gop.smodels2problog()
-        # for s in lf:
-        #     print(s)
+        for s in lf:
+            print(s)
         lf = gop.smodels2internal(**kwdargs)
         return lf
 
@@ -292,8 +293,11 @@ class SmodelsParser:
                 # p = True
                 return logic_graph.FALSE
             else:
-                p = a.probability if "body_" not in a.functor else True # a bit hacky
-                id = logic_graph.add_atom(name, p, name=name)
+                if a.probability is None:
+                    id = 0
+                else:
+                    p = a.probability if "body_" not in a.functor else True # a bit hacky
+                    id = logic_graph.add_atom(name, p, name=name)
             return id
 
     def add_body(self, logic_graph, body):
@@ -327,17 +331,20 @@ class SmodelsParser:
             id = self.add_literal(logic_graph, literal)
         return id
 
-    def expand_body(self, body_pos):
-        body_exp = []
-        for b_id in body_pos: # expand bodies 
+    def expand_body(self, body_pos, body_neg):
+        body_pos_exp = []
+        body_neg_exp = body_neg #[]
+        for b_id in body_pos: # expand bodies (assumption: boodies' ids are positive)
             if b_id in self.body_ids:
                 rule = self.raw_rules.get(b_id)[0]
-                n_pos = rule[2]
-                lits = rule[-n_pos:]
-                body_exp += lits
+                n_neg = rule[3]
+                n_lits = rule[4:4+n_neg]
+                p_lits = rule[4+n_neg:]
+                body_pos_exp += p_lits
+                body_neg_exp += n_lits
             else:
-                body_exp.append(b_id)
-        return body_exp
+                body_pos_exp.append(b_id)
+        return (body_pos_exp, body_neg_exp)
 
     def lookup_name(self, id):
         if id in self.names: # user-defined name
@@ -435,10 +442,10 @@ class SmodelsParser:
     def parse_rule(self, raw_rule):
         type, head, num_lit, num_neg = raw_rule[0:4]
         # if head not in self.body_ids: # and head in self.names:
-        body_neg = raw_rule[4:4+num_neg]
-        body_pos = raw_rule[4+num_neg:]
+        body_neg_short = raw_rule[4:4+num_neg]
+        # body_pos = raw_rule[4+num_neg:]
         body_pos_short = raw_rule[4+num_neg:]
-        body_pos = self.expand_body(body_pos_short)
+        body_pos, body_neg = self.expand_body(body_pos_short, body_neg_short)
         b_pos_names =  [self.lookup_name(b_id) for b_id in body_pos]
         b_pos_names =  [b_id for b_id in b_pos_names if b_id is not None]
         b_pos_terms = list(map(Term.from_string, b_pos_names))
@@ -480,9 +487,10 @@ class SmodelsParser:
             else:
                 if self.facts[f_id].functor.startswith("aux"):
                     del self.facts[f_id]
-                else:
-                    self.facts[f_id] = [self.facts[f_id]]
-                    
+                else: # no probability found: fact
+                #     # ft = f.with_args(*f.args, p=True)
+                    self.facts[f_id] = [f]
+
         for ad_line in self.annotated_disjunctions: # re-associate probabilities with annotated disjunctions
             for ad in self.annotated_disjunctions[ad_line]:
                 heads_with_prob = []
@@ -507,7 +515,7 @@ class SmodelsParser:
         smodels format:
         1 n 0 0 -> nth predicate is a fact
         3 1 n 0 0 -> choice rule for fact n
-        1 n l 0 b_1 b_2 ... b_l -> nth predicate is the head of a rule with body b_1, b_2,..., b_l
+        1 n l k b_1 b_2 b_k b_k+1 ... b_l -> nth predicate is the head of a rule with l literals of which k negated
         2 ... -> constraints for ADs: ignore that and related rules
         """
 
@@ -560,9 +568,9 @@ class SmodelsParser:
                 lf.add_name(name, id)
         # ADs
         ads = self.annotated_disjunctions_with_prob
-        for ad in ads:
+        for rule, ad in enumerate(ads):
             body_id = self.add_body(lf, ad.body)
-            rule = body_id
+            # rule = body_id
             choices = ad.body.args[2:]
             group = (rule, choices, "{{}}")
             constr = ConstraintAD(group)
