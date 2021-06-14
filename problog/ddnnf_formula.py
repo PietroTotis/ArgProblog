@@ -550,6 +550,7 @@ class SimpleDDNNFEvaluator(Evaluator):
     #                 yield (w+wprod, self.semiring.times(p, pprod))
 
     def multi_stable_models(self):
+        print("Counting stable models...")
         self.weights.clear()
         model_weights = self.formula.extract_weights(self.semiring, self.given_weights)
         self.weights = {key:(1.0,1.0) for key in model_weights}
@@ -562,6 +563,7 @@ class SimpleDDNNFEvaluator(Evaluator):
         print(self.multi_sm)
         self.counting_sm = False
         self.formula.clear_aux_queries()
+        print("counting done")
 
         # self._initialize()
     # Basic:

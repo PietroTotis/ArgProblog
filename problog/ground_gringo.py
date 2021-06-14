@@ -261,7 +261,6 @@ class SmodelsParser:
         self.ad_lines = []
         self.body_ids = []
         self.names = defaultdict(int)
-        self.prob_facts = []
 
         self.facts = defaultdict(int)
         self.queries = defaultdict(int)
@@ -299,8 +298,6 @@ class SmodelsParser:
                 else:
                     p = a.probability if "body_" not in a.functor else True # a bit hacky
                     id = logic_graph.add_atom(name, p, name=name)
-                    if p != True:
-                        self.prob_facts.append(id)
             return id
 
     def add_body(self, logic_graph, body):
@@ -653,7 +650,10 @@ class SmodelsParser:
             lf.add_query(q_term, id)
         
         # Possible worlds
-        for i, pw in enumerate(self.get_pws(self.prob_facts)):
+        prob_facts = [id for id in lf.get_weights()]
+        print(lf)
+        print(lf.get_weights())
+        for i, pw in enumerate(self.get_pws(prob_facts)):
             pw_name = Term(f"_pw_{i}")
             pw_head = lf.add_or((),name=pw_name,placeholder=True)
             lf.add_name(pw_name, id)
