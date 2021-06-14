@@ -16,7 +16,7 @@ from .constraint import ConstraintAD
 
 # add exception for unsupported elements of the language (lists, imports...)
 
-def ground_gringo(model, target=None, queries=None, evidence=None, propagate_evidence=True,
+def ground_gringo(model, target=None, queries=False, evidence=None, propagate_evidence=True,
                labels=None, engine=None, debug=False, **kwdargs):
     """Ground a given model.
 
@@ -61,12 +61,12 @@ def ground_gringo(model, target=None, queries=None, evidence=None, propagate_evi
             print(errmsg.decode('utf-8')) 
             raise err
         
-        print('\n'.join(converted) + '\n')
-        print(output)
+        # print('\n'.join(converted) + '\n')
+        # print(output)
         gop = SmodelsParser(output, queries, evidence)
         lf = gop.smodels2problog()
-        for s in lf:
-            print(s)
+        # for s in lf:
+        #     print(s)
         lf = gop.smodels2internal(**kwdargs)
         return lf
 
@@ -261,6 +261,7 @@ class SmodelsParser:
         self.ad_lines = []
         self.body_ids = []
         self.names = defaultdict(int)
+        self.prob_facts = []
 
         self.facts = defaultdict(int)
         self.queries = defaultdict(int)
@@ -298,6 +299,8 @@ class SmodelsParser:
                 else:
                     p = a.probability if "body_" not in a.functor else True # a bit hacky
                     id = logic_graph.add_atom(name, p, name=name)
+                    if p != True:
+                        self.prob_facts.append(id)
             return id
 
     def add_body(self, logic_graph, body):
@@ -330,6 +333,18 @@ class SmodelsParser:
         except KeyError:
             id = self.add_literal(logic_graph, literal)
         return id
+
+    def get_pws(self, prob_facts):
+        if len(prob_facts) == 0:
+            return []
+        else:
+            atom = prob_facts[0]
+            if len(prob_facts) == 1:
+                return [[atom], [-atom]]
+            else:
+                pw_pos = [ [atom] + part for part in self.get_pws(prob_facts[1:]) ]
+                pw_neg = [ [-atom] + part for part in self.get_pws(prob_facts[1:]) ]
+                return pw_pos + pw_neg
 
     def expand_body(self, body_pos, body_neg):
         body_pos_exp = []
@@ -560,12 +575,14 @@ class SmodelsParser:
 
     def smodels2internal(self, **kwdargs):
         lf = LogicGraph(**kwdargs)
+        
         # Heads
         for h in self.heads:
             if "aux" not in h.functor:
                 name = h.with_probability()
                 id = lf.add_or((),name=name,placeholder=True)
                 lf.add_name(name, id)
+        
         # ADs
         ads = self.annotated_disjunctions_with_prob
         for rule, ad in enumerate(ads):
@@ -634,6 +651,17 @@ class SmodelsParser:
             q_term = q.args[0]
             id = self.get_or_add(lf, q_term)
             lf.add_query(q_term, id)
+        
+        # Possible worlds
+        for i, pw in enumerate(self.get_pws(self.prob_facts)):
+            pw_name = Term(f"_pw_{i}")
+            pw_head = lf.add_or((),name=pw_name,placeholder=True)
+            lf.add_name(pw_name, id)
+            pw_id = lf.add_and(pw)
+            lf.add_disjunct(pw_head, pw_id)
+            lf.add_query(pw_name,pw_head)
+
+        
         return lf
 
     def smodels2problog(self, **kwdargs):

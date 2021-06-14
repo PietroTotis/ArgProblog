@@ -46,10 +46,11 @@ from problog.program import PrologFile
 from problog.logic import Term, Constant, ArithmeticError, term2list, list2term
 from problog.engine import DefaultEngine, UnknownClause, UnknownClauseInternal
 from problog.engine_builtin import check_mode, builtin_simple
-from problog.formula import LogicFormula
+from problog.formula import LogicFormula, LogicGraph
 from problog.errors import process_error, GroundingError
 from problog.util import start_timer, stop_timer, format_dictionary, init_logger
 from problog.engine_unify import UnifyError, unify_value
+from problog.ground_gringo import ground_gringo
 import random
 import math
 import signal
@@ -140,9 +141,9 @@ class FunctionStore(object):
         return _function
 
 
-class SampledFormula(LogicFormula):
+class SampledFormula(LogicGraph):
     def __init__(self, **kwargs):
-        LogicFormula.__init__(self, **kwargs)
+        LogicGraph.__init__(self, **kwargs)
         self.facts = {}
         self.groups = {}
         self.probability = 1.0  # Try to compute
@@ -446,6 +447,8 @@ def ground(engine, db, target):
     # Ground queries
     queries = [(target.LABEL_QUERY, q) for q in queries]
     engine.ground_queries(db, target, queries)
+    # print(queries)
+    print(ground_gringo(db))
     return target
 
 
@@ -537,7 +540,8 @@ def sample(
             result = ground(engine, db, target=target)
             if verify_evidence(engine, db, ev_target, target):
                 if format == "str":
-                    yield result.to_string(db, **kwdargs)
+                    # yield result.to_string(db, **kwdargs)
+                    yield result
                 else:
                     yield result.to_dict()
                 i += 1

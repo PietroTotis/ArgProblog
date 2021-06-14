@@ -69,7 +69,7 @@ def ground(model, target=None, grounder=None, **kwdargs):
         return ground_default(model, target, **kwdargs)
 
 
-@transform(LogicProgram, LogicFormula)
+# @transform(LogicProgram, LogicFormula)
 def ground_default(
     model,
     target=None,

@@ -267,6 +267,13 @@ class BaseFormula(ProbLogObject):
         """Remove all evidence."""
         self._names[self.LABEL_QUERY] = {}
 
+    def clear_aux_queries(self):
+        """Remove all evidence."""
+        qnames = list(self._names[self.LABEL_QUERY].keys())
+        for qname in qnames:
+            if str(qname).startswith("_pw_"):
+                del self._names[self.LABEL_QUERY][qname]
+
     def clear_labeled(self, label):
         """Remove all evidence."""
         self._names[label] = {}
@@ -1605,8 +1612,8 @@ class LogicFormula(BaseFormula):
                 prop = "," + prop
             if nodetype == "conj":
                 s += (
-                    '%s [label="AND", shape="box", style="filled", fillcolor="white"%s];\n'
-                    % (index, prop)
+                    '%s [label="AND %s", shape="box", style="filled", fillcolor="white"%s];\n'
+                    % (index, index,prop)
                 )
                 for c in node.children:
                     opt = ""
@@ -1622,8 +1629,8 @@ class LogicFormula(BaseFormula):
                         s += "%s -> %s%s;\n" % (index, c, opt)
             elif nodetype == "disj":
                 s += (
-                    '%s [label="OR", shape="diamond", style="filled", fillcolor="white"%s];\n '
-                    % (index, prop)
+                    '%s [label="OR %s", shape="diamond", style="filled", fillcolor="white"%s];\n '
+                    % (index,index,prop)
                 )
                 for c in node.children:
                     opt = ""

@@ -70,6 +70,7 @@ class SimpleDDNNFEvaluator(Evaluator):
         self.cache_intermediate = {}  # weights of intermediate nodes
         self.keytotal = {}
         self.keyworlds = {}
+        self.counting_sm = True
         self.multi_sm = Counter()
         # print(formula.to_dot())
         print(formula)
@@ -100,6 +101,113 @@ class SimpleDDNNFEvaluator(Evaluator):
             self._evaluate_evidence(recompute=recompute), self.formula
         )
 
+    ###################
+    #### original #####
+    ###################
+
+    def evaluate(self, node):
+        if node == 0:
+            if not self.semiring.is_nsp():
+                result = self.semiring.one()
+            else:
+                result = self.get_root_weight()
+                result = self.semiring.normalize(result, self._get_z())
+        elif node is None:
+            result = self.semiring.zero()
+        else:
+            p = self._get_weight(abs(node))
+            n = self._get_weight(-abs(node))
+            self._set_value(abs(node), (node > 0))
+            result = self.get_root_weight()
+            self._reset_value(abs(node), p, n)
+            if self.has_evidence() or self.semiring.is_nsp():
+                result = self.semiring.normalize(result, self._get_z())
+        return self.semiring.result(result, self.formula)
+
+    def get_root_weight(self):
+        """
+        Get the WMC of the root of this formula.
+        :return: The WMC of the root of this formula (WMC of node len(self.formula)), multiplied with weight of True
+        (self.weights.get(0)).
+        """
+        result = self._get_weight(len(self.formula))
+        return (
+            self.semiring.times(result, self.weights.get(0)[0])
+            if self.weights.get(0) is not None
+            else result
+        )
+
+    def _get_weight(self, index):
+        if index == 0:
+            return self.semiring.one()
+        elif index is None:
+            return self.semiring.zero()
+        else:
+            abs_index = abs(index)
+            w = self.weights.get(abs_index)  # Leaf nodes
+            if w is not None:
+                if index in self.multi_sm and not self.counting_sm:
+                    n = self.multi_sm[index]
+                    if n > 1:
+                        norm = self.semiring.value(1/n)
+                        w =  self.semiring.times(w[index < 0], norm)
+                        return w
+                else:
+                    return w[index < 0]
+            w = self.cache_intermediate.get(abs_index)  # Intermediate nodes
+            if w is None:
+                w = self._calculate_weight(index)
+                self.cache_intermediate[abs_index] = w
+            return w
+
+    def set_weight(self, index, pos, neg):
+        # index = index of atom in weights, so atom2var[key] = index
+        self.weights[index] = (pos, neg)
+        self.cache_intermediate.clear()
+
+    def _set_value(self, index, value):
+        """Set value for given node.
+
+        :param index: index of node
+        :param value: value
+        """
+        if value:
+            pos = self._get_weight(index)
+            self.set_weight(index, pos, self.semiring.zero())
+        else:
+            neg = self._get_weight(-index)
+            self.set_weight(index, self.semiring.zero(), neg)
+
+    def _calculate_weight(self, key):
+        assert key != 0
+        assert key is not None
+        # assert(key > 0)
+
+        node = self.formula.get_node(abs(key))
+        ntype = type(node).__name__
+
+        if ntype == "atom":
+            return self.semiring.one()
+        else:
+            assert key > 0
+            childprobs = [self._get_weight(c) for c in node.children]
+            # print(childprobs)
+            if ntype == "conj":
+                p = self.semiring.one()
+                for c in childprobs:
+                    p = self.semiring.times(p, c)
+                return p
+            elif ntype == "disj":
+                p = self.semiring.zero()
+                for c in childprobs:
+                    p = self.semiring.plus(p, c)
+                return p
+            else:
+                raise TypeError("Unexpected node type: '%s'." % ntype)
+
+    ##################
+    ##################
+
     # noinspection PyUnusedLocal
     def _evaluate_evidence(self, recompute=False):
         self._initialize(False)
@@ -112,61 +220,62 @@ class SimpleDDNNFEvaluator(Evaluator):
     def evaluate_fact(self, node):
         return self.evaluate(node)
 
-    def evaluate(self, node):
-        if node == 0:
-            if not self.semiring.is_nsp():
-                result = self.semiring.one()
-            else:
-                result = self.get_root_weight()
-                result = self.semiring.normalize(result, self._get_z())
-        elif node is None:
-            result = self.semiring.zero()
-        else:
-            ps = self._get_weight(abs(node))
-            p = self._aggregate_weights(ps)
-            ns = self._get_weight(-abs(node))
-            n = self._aggregate_weights(ns)
-            self._set_value(abs(node), (node > 0))
-            result = self.get_root_weight()
-            print("->",result)
-            self._reset_value(abs(node), p, n)
-            if self.has_evidence() or self.semiring.is_nsp():
-                result = self.semiring.normalize(result, self._get_z())
-        return self.semiring.result(result, self.formula)
+    # def evaluate(self, node):
+    #     if node == 0:
+    #         if not self.semiring.is_nsp():
+    #             result = self.semiring.one()
+    #         else:
+    #             result = self.get_root_weight()
+    #             result = self.semiring.normalize(result, self._get_z())
+    #     elif node is None:
+    #         result = self.semiring.zero()
+    #     else:
+    #         ps = self._get_weight(abs(node))
+    #         p = self._aggregate_weights(ps)
+    #         ns = self._get_weight(-abs(node))
+    #         n = self._aggregate_weights(ns)
+    #         self._set_value(abs(node), (node > 0))
+    #         result = self.get_root_weight()
+    #         print("->",result)
+    #         self._reset_value(abs(node), p, n)
+    #         if self.has_evidence() or self.semiring.is_nsp():
+    #             result = self.semiring.normalize(result, self._get_z())
+    #     return self.semiring.result(result, self.formula)
 
     def _reset_value(self, index, pos, neg):
         self.set_weight(index, pos, neg)
 
-    def get_root_weight(self):
-        """
-        Get the WMC of the root of this formula.
-        :return: The WMC of the root of this formula (WMC of node len(self.formula)), multiplied with weight of True
-        (self.weights.get(0)).
-        """
-        weights = self._get_weight(len(self.formula))
-        result = self._aggregate_weights(weights)
-        return (
-            self.semiring.times(result, self.weights.get(0)[0])
-            if self.weights.get(0) is not None
-            else result
-        )
+    # Basic
+    # def get_root_weight(self):
+    #     """
+    #     Get the WMC of the root of this formula.
+    #     :return: The WMC of the root of this formula (WMC of node len(self.formula)), multiplied with weight of True
+    #     (self.weights.get(0)).
+    #     """
+    #     weights = self._get_weight(len(self.formula))
+    #     result = self._aggregate_weights(weights)
+    #     return (
+    #         self.semiring.times(result, self.weights.get(0)[0])
+    #         if self.weights.get(0) is not None
+    #         else result
+    #     )
 
     # Basic
-    def _get_weight(self, index):
-        if index == 0:
-            return [self.semiring.one()]
-        elif index is None:
-            return [self.semiring.zero()]
-        else:
-            abs_index = abs(index)
-            w = self.weights.get(abs_index)  # Leaf nodes
-            if w is not None:
-                return [w[index < 0]]
-            w = self.cache_intermediate.get(abs_index)  # Intermediate nodes
-            if w is None:
-                w = self._calculate_weight(index)
-                self.cache_intermediate[abs_index] = w
-            return w
+    # def _get_weight(self, index):
+    #     if index == 0:
+    #         return [self.semiring.one()]
+    #     elif index is None:
+    #         return [self.semiring.zero()]
+    #     else:
+    #         abs_index = abs(index)
+    #         w = self.weights.get(abs_index)  # Leaf nodes
+    #         if w is not None:
+    #             return [w[index < 0]]
+    #         w = self.cache_intermediate.get(abs_index)  # Intermediate nodes
+    #         if w is None:
+    #             w = self._calculate_weight(index)
+    #             self.cache_intermediate[abs_index] = w
+    #         return w
 
     # Bug
     # def _get_weight(self, index):
@@ -188,10 +297,11 @@ class SimpleDDNNFEvaluator(Evaluator):
     #             self.cache_intermediate[abs_index] = w
     #         return w
 
-    def set_weight(self, index, pos, neg):
-        # index = index of atom in weights, so atom2var[key] = index
-        self.weights[index] = (pos, neg)
-        self.cache_intermediate.clear()
+    # Basic
+    # def set_weight(self, index, pos, neg):
+    #     # index = index of atom in weights, so atom2var[key] = index
+    #     self.weights[index] = (pos, neg)
+    #     self.cache_intermediate.clear()
 
     def set_evidence(self, index, value):
         curr_pos_weight, curr_neg_weight = self.weights.get(index)
@@ -209,20 +319,21 @@ class SimpleDDNNFEvaluator(Evaluator):
     def _deref_node(self, index):
         return self.formula.get_node(index).name
 
-    def _set_value(self, index, value):
-        """Set value for given node.
+    # Basic
+    # def _set_value(self, index, value):
+    #     """Set value for given node.
 
-        :param index: index of node
-        :param value: value
-        """
-        if value:
-            poss = self._get_weight(index)
-            pos = self._aggregate_weights(poss)
-            self.set_weight(index, pos, self.semiring.zero())
-        else:
-            negs = self._get_weight(-index)
-            neg = self._aggregate_weights(negs)
-            self.set_weight(index, self.semiring.zero(), neg)
+    #     :param index: index of node
+    #     :param value: value
+    #     """
+    #     if value:
+    #         poss = self._get_weight(index)
+    #         pos = self._aggregate_weights(poss)
+    #         self.set_weight(index, pos, self.semiring.zero())
+    #     else:
+    #         negs = self._get_weight(-index)
+    #         neg = self._aggregate_weights(negs)
+    #         self.set_weight(index, self.semiring.zero(), neg)
 
     # Bug
     # def _aggregate_weights(self, pws):
@@ -277,51 +388,52 @@ class SimpleDDNNFEvaluator(Evaluator):
     #             raise TypeError("Unexpected node type: '%s'." % ntype)
 
     # Basic: keep 0 worlds
-    def _calculate_weight(self, key):
-        assert key != 0
-        assert key is not None
-        # assert(key > 0)
+    # def _calculate_weight(self, key):
+    #     assert key != 0
+    #     assert key is not None
+    #     # assert(key > 0)
 
-        node = self.formula.get_node(abs(key))
-        ntype = type(node).__name__
+    #     node = self.formula.get_node(abs(key))
+    #     ntype = type(node).__name__
 
-        if ntype == "atom":
-            return [self.semiring.one()]
-        else:
-            assert key > 0
-            childprobs = [self._get_weight(c) for c in node.children]
-            # print(key, childprobs, len(self.multi_sm))
-            if ntype == "conj":
-                if len(self.multi_sm) == 0:
-                    c = self.semiring.one()
-                    for p in childprobs:
-                        c = self.semiring.times(c, p[0])
-                    return [c]
-                else:  
-                    w_conj = list(self.wproduct(childprobs))
-                    n_children = len(w_conj)
-                    if key in self.keyworlds:
-                        worlds = self.keyworlds[key]
-                        for c in range(0, n_children):
-                            pw = frozenset(worlds[c])
-                            n = self.multi_sm.get(pw,1)
-                            if n!=1 and not self.semiring.is_zero(w_conj[c]):
-                                norm = self.semiring.value(1/n)
-                                w_conj[c] = self.semiring.times(w_conj[c],norm)
-                    return w_conj
-            elif ntype == "disj":
-                if len(self.multi_sm) == 0:
-                    d = self.semiring.zero()
-                    for p in childprobs:
-                        d = self.semiring.plus(d, p[0])
-                    return [d]
-                else:
-                    cp_disj = []
-                    for weights in childprobs:
-                        cp_disj += [w for w in weights]
-                    return cp_disj
-            else:
-                raise TypeError("Unexpected node type: '%s'." % ntype)
+    #     if ntype == "atom":
+    #         return [self.semiring.one()]
+    #     else:
+    #         assert key > 0
+    #         childprobs = [self._get_weight(c) for c in node.children]
+    #         # print(key, childprobs, len(self.multi_sm))
+    #         if ntype == "conj":
+    #             # if len(self.multi_sm) == 0:
+    #             if len(self.multi_sm) == 0:
+    #                 c = self.semiring.one()
+    #                 for p in childprobs:
+    #                     c = self.semiring.times(c, p[0])
+    #                 return [c]
+    #             else:  
+    #                 w_conj = list(self.wproduct(childprobs))
+    #                 n_children = len(w_conj)
+    #                 if key in self.keyworlds:
+    #                     worlds = self.keyworlds[key]
+    #                     for c in range(0, n_children):
+    #                         pw = frozenset(worlds[c])
+    #                         n = self.multi_sm.get(pw,1)
+    #                         if n!=1 and not self.semiring.is_zero(w_conj[c]):
+    #                             norm = self.semiring.value(1/n)
+    #                             w_conj[c] = self.semiring.times(w_conj[c],norm)
+    #                 return w_conj
+    #         elif ntype == "disj":
+    #             if len(self.multi_sm) == 0:
+    #                 d = self.semiring.zero()
+    #                 for p in childprobs:
+    #                     d = self.semiring.plus(d, p[0])
+    #                 return [d]
+    #             else:
+    #                 cp_disj = []
+    #                 for weights in childprobs:
+    #                     cp_disj += [w for w in weights]
+    #                 return cp_disj
+    #         else:
+    #             raise TypeError("Unexpected node type: '%s'." % ntype)
 
 
     # def get_paths(self, key, atom):
@@ -438,33 +550,50 @@ class SimpleDDNNFEvaluator(Evaluator):
     #                 yield (w+wprod, self.semiring.times(p, pprod))
 
     def multi_stable_models(self):
-        weights = self.formula.get_weights()
-        choices = [key for key in weights if isinstance(weights[key],Constant)]
-        n_choices = len(choices)
-        print(choices, n_choices)
-        root = len(self.formula._nodes)
-        # n_choices = len([w for w in self.formula.get_weights().values() if isinstance(w,Constant)])
-        # print(choices)
-        # root = len(self.formula._nodes)
-        # paths = {key: self.get_paths(root, key) for key in choices}
-        # print(paths)
-
-        # self.multi_sm = Counter()
-        # pws = [[]]
-        # self.get_worlds(root, pws, n_choices)
-        # print(self.keyworlds)
-
-        self.get_worlds(root, n_choices)
-        worlds = [w for ws in self.keyworlds.values() for w in ws]
-        self.multi_sm = Counter(worlds)
+        self.weights.clear()
+        model_weights = self.formula.extract_weights(self.semiring, self.given_weights)
+        self.weights = {key:(1.0,1.0) for key in model_weights}
+        queries = self.formula.queries()
+        for qname, id in queries:
+            if str(qname).startswith("_pw_"):
+                w = self.evaluate(id)
+                self.multi_sm[id] = w
+        print("=========")
         print(self.multi_sm)
-        # print(self.multi_sm)
-        # if len(self.multi_sm) > 0:
-        #     _, min_count = self.multi_sm.most_common()[-1]
-        self.multi_sm = {k: c for k, c in self.multi_sm.items() if c>1}
-            # self.multi_sm = {k: c/min_count for k, c in self.multi_sm.items() if c/min_count>1}
-        print(self.multi_sm, len(self.multi_sm))
-        print("")
+        self.counting_sm = False
+        self.formula.clear_aux_queries()
+
+        # self._initialize()
+    # Basic:
+    # def multi_stable_models(self):
+    #     weights = self.formula.get_weights()
+    #     choices = [key for key in weights if isinstance(weights[key],Constant)]
+    #     n_choices = len(choices)
+    #     print(choices, n_choices)
+    #     root = len(self.formula._nodes)
+    #     # n_choices = len([w for w in self.formula.get_weights().values() if isinstance(w,Constant)])
+    #     # print(choices)
+    #     # root = len(self.formula._nodes)
+    #     # paths = {key: self.get_paths(root, key) for key in choices}
+    #     # print(paths)
+
+    #     # self.multi_sm = Counter()
+    #     # pws = [[]]
+    #     # self.get_worlds(root, pws, n_choices)
+    #     # print(self.keyworlds)
+
+    #     self.get_worlds(root, n_choices)
+    #     worlds = [w for ws in self.keyworlds.values() for w in ws]
+    #     self.multi_sm = Counter(worlds)
+    #     print(self.multi_sm)
+    #     print(self.keyworlds)
+    #     # print(self.multi_sm)
+    #     # if len(self.multi_sm) > 0:
+    #     #     _, min_count = self.multi_sm.most_common()[-1]
+    #     self.multi_sm = {k: c for k, c in self.multi_sm.items() if c>1}
+    #         # self.multi_sm = {k: c/min_count for k, c in self.multi_sm.items() if c/min_count>1}
+    #     print(self.multi_sm, len(self.multi_sm))
+    #     print("")
 
 class Compiler(object):
     """Interface to CNF to d-DNNF compiler tool."""
