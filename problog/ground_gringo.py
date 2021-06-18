@@ -4,7 +4,7 @@ import sys
 import os
 
 from .util import subprocess_check_output, mktempfile, Timer
-from logging import getLogger
+from logging import getLogger, log
 from .logic import AnnotatedDisjunction, term2str, Term, Clause, Or, Constant, And, Not
 from collections import defaultdict, deque
 from subprocess import CalledProcessError
@@ -16,34 +16,33 @@ from .constraint import ConstraintAD
 
 # add exception for unsupported elements of the language (lists, imports...)
 
-def ground_gringo(model, target=None, queries=None, evidence=None, propagate_evidence=True,
+def ground_gringo(model, target=None, queries=[], evidence=[], propagate_evidence=False,
                labels=None, engine=None, debug=False, **kwdargs):
     """Ground a given model.
 
     :param model: logic program to ground
     :type model: LogicProgram
     :param target: formula in which to store ground program
-    :type target: LogicFormula
+    :type target: LogicGraph
     :param queries: list of queries to override the default
     :param evidence: list of evidence atoms to override the default
     :return: the ground program
-    :rtype: LogicFormula
+    :rtype: LogicGraph
     """
-
 
     with Timer('Grounding (Gringo)'):
 
         if debug:
             fn_model = '/tmp/model.pl'
-            fn_ground = '/tmp/model.ground'
-            fn_evidence = '/tmp/model.evidence'
-            fn_query = '/tmp/model.query'
+            # fn_ground = '/tmp/model.ground'
+            # fn_evidence = '/tmp/model.evidence'
+            # fn_query = '/tmp/model.query'
 
         else:
             fn_model = mktempfile('.pl')
-            fn_ground = mktempfile('.ground')
-            fn_evidence = mktempfile('.evidence')
-            fn_query = mktempfile('.query')
+            # fn_ground = mktempfile('.ground')
+            # fn_evidence = mktempfile('.evidence')
+            # fn_query = mktempfile('.query')
 
         converted = [statement_to_gringo(l, stmt) for l, stmt in enumerate(model)]
 
@@ -61,13 +60,29 @@ def ground_gringo(model, target=None, queries=None, evidence=None, propagate_evi
             print(errmsg.decode('utf-8')) 
             raise err
         
-        print('\n'.join(converted) + '\n')
+        print("----")
+        # print('\n'.join(converted) + '\n')
         print(output)
-        gop = SmodelsParser(output, queries, evidence)
+        gop = SmodelsParser(output, target=target, queries=queries, evidence=evidence)
         lf = gop.smodels2problog()
         for s in lf:
             print(s)
+        print("---")
         lf = gop.smodels2internal(**kwdargs)
+        if propagate_evidence:
+            with Timer("Propagating evidence"):
+                lf.lookup_evidence = {}
+                ev_nodes = [
+                    node
+                    for name, node in lf.evidence()
+                    if node != 0 and node is not None
+                ]
+                lf.propagate(ev_nodes, lf.lookup_evidence)
+        print("-------")
+        for i in lf:
+            print(i)
+        # print(lf._names)
+        print("-------")
         return lf
 
 def annotated_disjunction_to_gringo(ad, line):
@@ -248,10 +263,11 @@ class SmodelsParser:
     Manages the Gringo->Problog transformation
     """
 
-    def __init__(self, output, queries=None, evidence=None):
+    def __init__(self, output, target=None, queries=None, evidence=None):
 
         self.given_queries = queries
-        self.given_evidence = {}
+        self.given_evidence = evidence
+        self.target = target
 
         self.output = output
         self.lines = []
@@ -296,7 +312,7 @@ class SmodelsParser:
                 if a.probability is None:
                     id = 0
                 else:
-                    p = a.probability if "body_" not in a.functor else True # a bit hacky
+                    p = a.probability if not a.functor.startswith("body_") else True # a bit hacky
                     id = logic_graph.add_atom(name, p, name=name)
             return id
 
@@ -336,12 +352,16 @@ class SmodelsParser:
         body_neg_exp = body_neg #[]
         for b_id in body_pos: # expand bodies (assumption: boodies' ids are positive)
             if b_id in self.body_ids:
-                rule = self.raw_rules.get(b_id)[0]
-                n_neg = rule[3]
-                n_lits = rule[4:4+n_neg]
-                p_lits = rule[4+n_neg:]
-                body_pos_exp += p_lits
-                body_neg_exp += n_lits
+                # print(self.body_ids, b_id)
+                # print(self.raw_rules)
+                if b_id in self.raw_rules:
+                    rule = self.raw_rules.get(b_id)[0]
+                    n_neg = rule[3]
+                    n_lits = rule[4:4+n_neg]
+                    p_lits = rule[4+n_neg:]
+                    body_pos_exp += p_lits
+                    body_neg_exp += n_lits
+                # else: no need to expand b_id (fact)
             else:
                 body_pos_exp.append(b_id)
         return (body_pos_exp, body_neg_exp)
@@ -358,6 +378,7 @@ class SmodelsParser:
     def parse_ad_rule(self, raw_rule):
         # smodels format: 3 num_heads heads 1 0 rule_id
         # where rule_id is the head of a new rule with the ad's body as body
+        # print(raw_rule)
         num_heads = raw_rule[1]
         heads = raw_rule[2:num_heads+2]
         head_names = [self.lookup_name(h_id) for h_id in heads]
@@ -371,7 +392,10 @@ class SmodelsParser:
             b_terms = [self.facts[rule_id]]
         else: # different rule for multi-term body
             body = self.base_rules[rule_id][0].body
-            b_terms = body.to_list()
+            if isinstance(body, And):
+                b_terms = body.to_list()
+            else:
+                b_terms = [body]
         for t in b_terms:
             if t.functor == "aux_line":
                 line = int(t.args[0])
@@ -559,19 +583,29 @@ class SmodelsParser:
             l += 1
 
     def smodels2internal(self, **kwdargs):
-        lf = LogicGraph(**kwdargs)
+        if self.target is None:
+            lf = LogicGraph(**kwdargs)
+        else:
+            print(self.target)
+            lf = self.target
+
         # Heads
         for h in self.heads:
             if "aux" not in h.functor:
                 name = h.with_probability()
-                id = lf.add_or((),name=name,placeholder=True)
+                try:
+                    id = lf.get_node_by_name(name)
+                except KeyError:
+                    id = lf.add_or((), name=name, placeholder=True)
                 lf.add_name(name, id)
         # ADs
         ads = self.annotated_disjunctions_with_prob
         for rule, ad in enumerate(ads):
-            body_id = self.add_body(lf, ad.body)
-            # rule = body_id
-            choices = ad.body.args[2:]
+            if ad.body:
+                body_id = self.add_body(lf, ad.body)
+                choices = ad.body.args[2:]
+            else:
+                choices = ()
             group = (rule, choices, "{{}}")
             constr = ConstraintAD(group)
             for n_head, head in enumerate(ad.heads):
@@ -583,13 +617,16 @@ class SmodelsParser:
                     name = Term("choice", rule, Constant(n_head), lit, choices[0])
                 else:
                     name = Term("choice", rule, Constant(n_head), lit, choices)
+                h_id = self.get_or_add(lf, lit)
                 id = lf.add_atom(identifier, head.probability, group, name)
+                lf.add_disjunct(h_id,id)
                 constr.add(id, lf)
-            for node in constr.nodes:
-                name = lf.get_node(node).name.args[2]
-                or_id = lf.get_node_by_name(name)
-                and_id = lf.add_and([body_id, node])
-                lf.add_disjunct(or_id, and_id)
+            if ad.body:
+                for node in constr.nodes:
+                    name = lf.get_node(node).name.args[2]
+                    or_id = lf.get_node_by_name(name)
+                    and_id = lf.add_and([body_id, node])
+                    lf.add_disjunct(or_id, and_id)
 
         # Facts
         for f_id in self.facts:
@@ -607,8 +644,9 @@ class SmodelsParser:
                 for b in bodies:
                     body_id = self.add_body(lf, b)
                     lf.add_disjunct(or_id, body_id)
-                    
+
         # Evidence
+
         for e_id in self.evidence:
             e = self.evidence[e_id]
             e_term =  e.args[0]
@@ -619,21 +657,22 @@ class SmodelsParser:
             else:
                 val = LogicGraph.LABEL_EVIDENCE_POS
             lf.add_evidence(e_term.with_probability(), id, val)
-        for e, b_val in self.given_evidence:
-            id = self.get_or_add(lf, e)
-            if b_val:
-                val = LogicGraph.LABEL_EVIDENCE_POS
-                id = -id
-            else:
-                val = LogicGraph.LABEL_EVIDENCE_NEG
-            lf.add_evidence(e, id, val)
         
+        for e, val in self.given_evidence:
+            id = self.get_or_add(lf, e)
+            lf.add_evidence(e, id, val, keep_name=True)
+
         # Queries
         for q_id in self.queries:
             q = self.queries[q_id]
             q_term = q.args[0]
             id = self.get_or_add(lf, q_term)
             lf.add_query(q_term, id)
+        
+        for q in self.given_queries:
+            id = self.get_or_add(lf, q)
+            lf.add_query(q, id)
+        
         return lf
 
     def smodels2problog(self, **kwdargs):

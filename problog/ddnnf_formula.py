@@ -72,7 +72,7 @@ class SimpleDDNNFEvaluator(Evaluator):
         self.keyworlds = {}
         self.multi_sm = Counter()
         # print(formula.to_dot())
-        print(formula)
+        # print(formula)
         self.multi_stable_models()
 
     def _initialize(self, with_evidence=True):
@@ -128,7 +128,7 @@ class SimpleDDNNFEvaluator(Evaluator):
             n = self._aggregate_weights(ns)
             self._set_value(abs(node), (node > 0))
             result = self.get_root_weight()
-            print("->",result)
+            # print("->",result)
             self._reset_value(abs(node), p, n)
             if self.has_evidence() or self.semiring.is_nsp():
                 result = self.semiring.normalize(result, self._get_z())
@@ -441,7 +441,7 @@ class SimpleDDNNFEvaluator(Evaluator):
         weights = self.formula.get_weights()
         choices = [key for key in weights if isinstance(weights[key],Constant)]
         n_choices = len(choices)
-        print(choices, n_choices)
+        # print(choices, n_choices)
         root = len(self.formula._nodes)
         # n_choices = len([w for w in self.formula.get_weights().values() if isinstance(w,Constant)])
         # print(choices)
@@ -457,14 +457,14 @@ class SimpleDDNNFEvaluator(Evaluator):
         self.get_worlds(root, n_choices)
         worlds = [w for ws in self.keyworlds.values() for w in ws]
         self.multi_sm = Counter(worlds)
-        print(self.multi_sm)
+        # print(self.multi_sm)
         # print(self.multi_sm)
         # if len(self.multi_sm) > 0:
         #     _, min_count = self.multi_sm.most_common()[-1]
         self.multi_sm = {k: c for k, c in self.multi_sm.items() if c>1}
             # self.multi_sm = {k: c/min_count for k, c in self.multi_sm.items() if c/min_count>1}
-        print(self.multi_sm, len(self.multi_sm))
-        print("")
+        # print(self.multi_sm, len(self.multi_sm))
+        # print("")
 
 class Compiler(object):
     """Interface to CNF to d-DNNF compiler tool."""
@@ -573,10 +573,11 @@ def _compile_with_dsharp_asp(cnf, nnf=None, smooth=True, **kwdargs):
         os.close(fd1)
         os.close(fd2)
         if smooth:
-            smoothl = ['-smoothNNF']
+            smoothl = '-smoothNNF'
         else:
-            smoothl = ['']
-        cmd = ['dsharp_with_unfounded', '-noIBCP', '-evidencePropagated', '-noPP', '-Fnnf', nnf_file, '-smoothNNF', '-disableAllLits', cnf_file]
+            smoothl = ''
+        # cmd = ['dsharp_with_unfounded', '-noIBCP', '-evidencePropagated', '-noPP', '-Fnnf', nnf_file, smoothl, '-disableAllLits', cnf_file]
+        cmd = ['dsharp_with_unfounded', '-noIBCP', '-noPP', '-Fnnf', nnf_file, smoothl, '-disableAllLits', cnf_file]
 
         try:
             result = _compile(cnf, cmd, cnf_file, nnf_file)

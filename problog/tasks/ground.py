@@ -21,7 +21,7 @@ from __future__ import print_function
 import os
 import sys
 
-from problog.formula import LogicDAG, LogicFormula, LogicNNF
+from problog.formula import LogicDAG, LogicFormula, LogicNNF, LogicGraph
 from problog.evaluator import SemiringLogProbability
 from problog.parser import DefaultPrologParser
 from problog.program import ExtendedPrologFactory, PrologFile
@@ -108,7 +108,8 @@ def main(argv, result_handler=None):
     elif args.break_cycles or outformat == "cnf":
         target = LogicDAG
     else:
-        target = LogicFormula
+        # target = LogicFormula
+        target = LogicGraph
 
     if args.propagate_weights:
         semiring = SemiringLogProbability()
