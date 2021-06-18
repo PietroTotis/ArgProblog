@@ -250,7 +250,6 @@ class BaseFormula(ProbLogObject):
         :param key: key of the query node
         :param value: value of the evidence (True, False or None)
         """
-        print(name,key, value)
         if value is None:
             self.add_name(name, key, self.LABEL_EVIDENCE_MAYBE, keep_name=keep_name)
         elif value:
@@ -1880,7 +1879,7 @@ class LogicGraph(LogicFormula):
             self.nodes_in_scc.append(nodes)
 
     def get_successors(self, n):
-        if n < 0:
+        if n <= 0:
             return []   
         node = self.get_node(n)
         if isinstance(node, atom):

@@ -60,14 +60,14 @@ def ground_gringo(model, target=None, queries=[], evidence=[], propagate_evidenc
             print(errmsg.decode('utf-8')) 
             raise err
         
-        print("----")
+        # print("----")
         # print('\n'.join(converted) + '\n')
-        print(output)
+        # print(output)
         gop = SmodelsParser(output, target=target, queries=queries, evidence=evidence)
         lf = gop.smodels2problog()
-        for s in lf:
-            print(s)
-        print("---")
+        # for s in lf:
+        #     print(s)
+        # print("---")
         lf = gop.smodels2internal(**kwdargs)
         if propagate_evidence:
             with Timer("Propagating evidence"):
@@ -78,11 +78,7 @@ def ground_gringo(model, target=None, queries=[], evidence=[], propagate_evidenc
                     if node != 0 and node is not None
                 ]
                 lf.propagate(ev_nodes, lf.lookup_evidence)
-        print("-------")
-        for i in lf:
-            print(i)
-        # print(lf._names)
-        print("-------")
+        print(lf)
         return lf
 
 def annotated_disjunction_to_gringo(ad, line):
@@ -383,9 +379,6 @@ class SmodelsParser:
         heads = raw_rule[2:num_heads+2]
         head_names = [self.lookup_name(h_id) for h_id in heads]
         head_terms = list(map(Term.from_string, head_names))       #
-        for h in head_terms:
-            if h not in self.heads:
-                self.heads.append(h.with_probability())
         # gringo creates a new rule for ads bodies longer than 1
         rule_id = raw_rule[-1]
         if rule_id in self.facts: # only aux_line
@@ -396,6 +389,10 @@ class SmodelsParser:
                 b_terms = body.to_list()
             else:
                 b_terms = [body]
+        
+        for h in head_terms:
+            if h not in self.heads and len(b_terms)>1:
+                self.heads.append(h.with_probability())
         for t in b_terms:
             if t.functor == "aux_line":
                 line = int(t.args[0])
@@ -586,7 +583,6 @@ class SmodelsParser:
         if self.target is None:
             lf = LogicGraph(**kwdargs)
         else:
-            print(self.target)
             lf = self.target
 
         # Heads
@@ -617,9 +613,9 @@ class SmodelsParser:
                     name = Term("choice", rule, Constant(n_head), lit, choices[0])
                 else:
                     name = Term("choice", rule, Constant(n_head), lit, choices)
-                h_id = self.get_or_add(lf, lit)
+                # h_id = self.get_or_add(lf, lit)
                 id = lf.add_atom(identifier, head.probability, group, name)
-                lf.add_disjunct(h_id,id)
+                # lf.add_disjunct(h_id,id)
                 constr.add(id, lf)
             if ad.body:
                 for node in constr.nodes:
