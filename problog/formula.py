@@ -1605,8 +1605,8 @@ class LogicFormula(BaseFormula):
                 prop = "," + prop
             if nodetype == "conj":
                 s += (
-                    '%s [label="AND", shape="box", style="filled", fillcolor="white"%s];\n'
-                    % (index, prop)
+                    '%s [label="AND (%s)", shape="box", style="filled", fillcolor="white"%s];\n'
+                    % (index, index, prop)
                 )
                 for c in node.children:
                     opt = ""
@@ -1622,8 +1622,8 @@ class LogicFormula(BaseFormula):
                         s += "%s -> %s%s;\n" % (index, c, opt)
             elif nodetype == "disj":
                 s += (
-                    '%s [label="OR", shape="diamond", style="filled", fillcolor="white"%s];\n '
-                    % (index, prop)
+                    '%s [label="OR (%s)", shape="diamond", style="filled", fillcolor="white"%s];\n '
+                    % (index, index, prop)
                 )
                 for c in node.children:
                     opt = ""
@@ -1822,8 +1822,8 @@ class LogicGraph(LogicFormula):
         self.body_ids = []
 
         self.replace_non_anon_conj()
-        e_ids =[e[1] for e in self.evidence_all()]
-        self.propagate(e_ids) # evidence must be propagated
+        # e_ids =[e[1] for e in self.evidence_all()]
+        # self.propagate(e_ids) 
 
         for index, node, nodetype in self:
             if node.name is not None and not hasattr(node, 'probability'):

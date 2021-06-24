@@ -10,9 +10,10 @@ from collections import defaultdict, deque
 from subprocess import CalledProcessError
 from .errors import GroundingError
 from .engine import UnknownClause
-from .program import SimpleProgram
+from .program import SimpleProgram, PrologString
 from .formula import LogicGraph
 from .constraint import ConstraintAD
+from .clausedb import ClauseDB
 
 # add exception for unsupported elements of the language (lists, imports...)
 
@@ -44,7 +45,14 @@ def ground_gringo(model, target=None, queries=[], evidence=[], propagate_evidenc
             # fn_evidence = mktempfile('.evidence')
             # fn_query = mktempfile('.query')
 
+        if isinstance(model, ClauseDB): # awful but need to go back from clausedb to a problog program
+            model = PrologString(model.to_prolog())
         converted = [statement_to_gringo(l, stmt) for l, stmt in enumerate(model)]
+
+        # print("In:")
+        # print('\n'.join([str(s) for s in model]) + '\n')
+        # print("Conv:")
+        # print('\n'.join(converted) + '\n')
 
         with open(fn_model, 'w') as f:
             f.write('\n'.join(converted) + '\n')
@@ -61,13 +69,12 @@ def ground_gringo(model, target=None, queries=[], evidence=[], propagate_evidenc
             raise err
         
         # print("----")
-        # print('\n'.join(converted) + '\n')
         # print(output)
         gop = SmodelsParser(output, target=target, queries=queries, evidence=evidence)
         lf = gop.smodels2problog()
+        # print("ProbL")
         # for s in lf:
         #     print(s)
-        # print("---")
         lf = gop.smodels2internal(**kwdargs)
         if propagate_evidence:
             with Timer("Propagating evidence"):
@@ -78,7 +85,9 @@ def ground_gringo(model, target=None, queries=[], evidence=[], propagate_evidenc
                     if node != 0 and node is not None
                 ]
                 lf.propagate(ev_nodes, lf.lookup_evidence)
-        print(lf)
+        # print("Form")
+        # print(lf)
+        # print("---")
         return lf
 
 def annotated_disjunction_to_gringo(ad, line):
@@ -472,7 +481,7 @@ class SmodelsParser:
         b_pos_terms = list(map(Term.from_string, b_pos_names))
         b_neg_names =  [self.lookup_name(b_id) for b_id in body_neg]
         b_neg_names =  [b_id for b_id in b_neg_names if b_id is not None]
-        b_neg_terms = [Not("\+", Term.from_string(b_neg_name)) for b_neg_name in b_neg_names]
+        b_neg_terms = [Not("\\+", Term.from_string(b_neg_name)) for b_neg_name in b_neg_names]
         r_name = self.lookup_name(head)
         if head not in self.body_ids:
             if r_name.startswith('query('):
@@ -615,6 +624,7 @@ class SmodelsParser:
                     name = Term("choice", rule, Constant(n_head), lit, choices)
                 # h_id = self.get_or_add(lf, lit)
                 id = lf.add_atom(identifier, head.probability, group, name)
+                lf.add_name(lit, id, label="AD_head")
                 # lf.add_disjunct(h_id,id)
                 constr.add(id, lf)
             if ad.body:
@@ -634,6 +644,7 @@ class SmodelsParser:
         for r_id in self.base_rules:
             head = self.base_rules[r_id][0].head
             name = head.with_probability()
+            # print(">>>", head)
             if "aux_" not in head.functor: # avoid aux atoms
                 or_id = self.get_or_add(lf, head)
                 bodies = [rule.body for rule in self.base_rules[r_id]]

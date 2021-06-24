@@ -128,9 +128,9 @@ class SimpleDDNNFEvaluator(Evaluator):
             n = self._aggregate_weights(ns)
             self._set_value(abs(node), (node > 0))
             result = self.get_root_weight()
-            # print("->",result)
             self._reset_value(abs(node), p, n)
             if self.has_evidence() or self.semiring.is_nsp():
+                # print(result, self._get_z())
                 result = self.semiring.normalize(result, self._get_z())
         return self.semiring.result(result, self.formula)
 
@@ -401,13 +401,21 @@ class SimpleDDNNFEvaluator(Evaluator):
             if ntype == 'conj':
                 cw_conj = list(self.product(childworlds))
                 # print("cj:", key,  cw_conj)
-                if len(cw_conj) > 0 and len(cw_conj[0]) == n_choices:
-                    self.keyworlds[key] = [frozenset(w) for w in cw_conj]
+                for i, w in enumerate(cw_conj):
+                    if len(w) == n_choices:
+                        cw_conj[i] = []
+                        fw = frozenset(w)
+                        if key in self.keyworlds:
+                            self.keyworlds[key].append(fw)
+                        else:
+                            self.keyworlds[key] = [fw]
+                # if len(cw_conj) > 0 and len(cw_conj[0]) == n_choices:
+                #     self.keyworlds[key] = [frozenset(w) for w in cw_conj]
                 return cw_conj
             elif ntype == 'disj':
                 disj = []
                 for cws in childworlds:
-                    disj += [w for w in cws if len(w) != n_choices]
+                    disj += [w for w in cws if len(w) < n_choices or n_choices==1]
                 # print("dws:", disj)
                 return disj
             else:
@@ -452,12 +460,10 @@ class SimpleDDNNFEvaluator(Evaluator):
         # self.multi_sm = Counter()
         # pws = [[]]
         # self.get_worlds(root, pws, n_choices)
-        # print(self.keyworlds)
 
         self.get_worlds(root, n_choices)
         worlds = [w for ws in self.keyworlds.values() for w in ws]
         self.multi_sm = Counter(worlds)
-        # print(self.multi_sm)
         # print(self.multi_sm)
         # if len(self.multi_sm) > 0:
         #     _, min_count = self.multi_sm.most_common()[-1]
