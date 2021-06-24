@@ -72,7 +72,7 @@ class SimpleDDNNFEvaluator(Evaluator):
         self.keyworlds = {}
         self.counting_sm = True
         self.multi_sm = Counter()
-        # print(formula.to_dot())
+        print(formula.to_dot())
         print(formula)
         self.multi_stable_models()
 
@@ -707,7 +707,7 @@ def _compile_with_dsharp_asp(cnf, nnf=None, smooth=True, **kwdargs):
             smoothl = ['-smoothNNF']
         else:
             smoothl = ['']
-        cmd = ['dsharp_with_unfounded', '-noIBCP', '-evidencePropagated', '-noPP', '-Fnnf', nnf_file, '-smoothNNF', '-disableAllLits', cnf_file]
+        cmd = ['dsharp_with_unfounded', '-Fnnf', nnf_file, '-smoothNNF',  cnf_file]
 
         try:
             result = _compile(cnf, cmd, cnf_file, nnf_file)
