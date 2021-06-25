@@ -71,7 +71,7 @@ class SimpleDDNNFEvaluator(Evaluator):
         self.keytotal = {}
         self.keyworlds = {}
         self.multi_sm = Counter()
-        print(formula.to_dot())
+        # print(formula.to_dot())
         # print(formula)
         self.multi_stable_models()
 
@@ -633,9 +633,9 @@ def _compile(cnf, cmd, cnf_file, nnf_file):
         success = False
         while attempts_left and not success:
             try:
-                subprocess_check_call(cmd)
-                # with open(os.devnull, "w") as OUT_NULL:
-                #     subprocess_check_call(cmd, stdout=OUT_NULL)
+                # subprocess_check_call(cmd)
+                with open(os.devnull, "w") as OUT_NULL:
+                    subprocess_check_call(cmd, stdout=OUT_NULL)
                 success = True
             except subprocess.CalledProcessError as err:
                 attempts_left -= 1

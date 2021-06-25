@@ -11,6 +11,7 @@
             "request": "launch",
             "program": "problog-cli.py",
             "console": "integratedTerminal",
+            "args" : ["lfi", "-n", "100",  "/media/windows/Users/pietr/Desktop/PhD/Problogs/ASP-Problog/test/learning/4.pl","/media/windows/Users/pietr/Desktop/PhD/Problogs/ASP-Problog/test/learning/4.ev", "-v", "-v", "-v", "-v", "-v"]
             // "args" : ["--nologspace","/media/windows/Users/pietr/Desktop/PhD/Problogs/ASP-Problog/test/learning/base.pl"]
             // "args" : ["lfi", "-n", "100",  "/media/windows/Users/pietr/Desktop/PhD/Problogs/ASP-Problog/test/learning/3.pl","/media/windows/Users/pietr/Desktop/PhD/Problogs/ASP-Problog/test/learning/2.ev", "-v", "-v", "-v", "-v", "-v"]
             // "args" : ["--nologspace","/media/windows/Users/pietr/Desktop/PhD/Problogs/ASP-Problog/test/simple_neg_cycle/mixed.pl"]
@@ -23,7 +24,7 @@
             // "args" : ["--nologspace","/media/windows/Users/pietr/Desktop/PhD/Problogs/ASP-Problog/test/simple_neg_cycle/neg_head/neg_heads.pl"]
             // "args" : ["--nologspace","/media/windows/Users/pietr/Desktop/PhD/Problogs/ASP-Problog/test/smokers_easy.pl"]
             // "args" : ["/media/windows/Users/pietr/Desktop/PhD/Problogs/ASP-Problog/test/args.pl"]
-            "args" : ["--nologspace","/media/windows/Users/pietr/Desktop/PhD/Problogs/ASP-Problog/test/simple_neg_cycle/neg/neg.pl"]
+            // "args" : ["--nologspace","/media/windows/Users/pietr/Desktop/PhD/Problogs/ASP-Problog/test/simple_neg_cycle/neg/neg.pl"]
             // "args" : ["ground","/media/windows/Users/pietr/Desktop/PhD/Problogs/ASP-Problog/test/bug/2.pl"]
             // "args" : ["--nologspace","/media/windows/Users/pietr/Desktop/PhD/Problogs/ASP-Problog/test/bug/2.pl"]
             // "args" : ["--nologspace","/media/windows/Users/pietr/Desktop/PhD/Problogs/ASP-Problog/test/hard_neg_cycle.pl"]
