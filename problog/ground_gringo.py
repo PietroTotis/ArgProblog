@@ -651,8 +651,6 @@ class SmodelsParser:
         
         # Possible worlds
         prob_facts = [id for id in lf.get_weights()]
-        print(lf)
-        print(lf.get_weights())
         for i, pw in enumerate(self.get_pws(prob_facts)):
             pw_name = Term(f"_pw_{i}")
             pw_head = lf.add_or((),name=pw_name,placeholder=True)

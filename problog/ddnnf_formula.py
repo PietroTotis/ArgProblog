@@ -73,15 +73,19 @@ class SimpleDDNNFEvaluator(Evaluator):
         self.keyworlds = {}
         self.counting_sm = True
         self.multi_sm = Counter()
-        print(formula.to_dot())
-        print(formula)
-        self.multi_stable_models()
+        # print(formula.to_dot())
+        # print(formula)
+        # self.multi_stable_models()
 
     def _initialize(self, with_evidence=True):
         self.weights.clear()
 
         model_weights = self.formula.extract_weights(self.semiring, self.given_weights)
         self.weights = model_weights.copy()
+
+        self.sm_weights = {key:(1.0,1.0) for key in self.weights}
+        self.pw_queries = [id for qname,id in self.formula.queries() if str(qname).startswith("_pw_")]
+        self.formula.clear_aux_queries()
 
         if with_evidence:
             for ev in self.evidence():
@@ -93,8 +97,8 @@ class SimpleDDNNFEvaluator(Evaluator):
     def propagate(self):
         self._initialize()
 
-    def _get_z(self):
-        result = self.get_root_weight()
+    def _get_z(self, sm=False):
+        result = self.get_root_weight(sm)
         return result
 
     def evaluate_evidence(self, recompute=False):
@@ -118,20 +122,20 @@ class SimpleDDNNFEvaluator(Evaluator):
         else:
             p = self._get_weight(abs(node), sm)
             n = self._get_weight(-abs(node), sm)
-            self._set_value(abs(node), (node > 0))
-            result = self.get_root_weight()
-            self._reset_value(abs(node), p, n)
+            self._set_value(abs(node), (node > 0), sm)
+            result = self.get_root_weight(sm)
+            self._reset_value(abs(node), p, n, sm)
             if self.has_evidence() or self.semiring.is_nsp():
-                result = self.semiring.normalize(result, self._get_z())
+                result = self.semiring.normalize(result, self._get_z(sm))
         return self.semiring.result(result, self.formula)
 
-    def get_root_weight(self):
+    def get_root_weight(self, sm=False):
         """
         Get the WMC of the root of this formula.
         :return: The WMC of the root of this formula (WMC of node len(self.formula)), multiplied with weight of True
         (self.weights.get(0)).
         """
-        result = self._get_weight(len(self.formula))
+        result = self._get_weight(len(self.formula), sm)
         return (
             self.semiring.times(result, self.weights.get(0)[0])
             if self.weights.get(0) is not None
@@ -153,23 +157,26 @@ class SimpleDDNNFEvaluator(Evaluator):
             abs_index = abs(index)
             w = weights.get(abs_index)  # Leaf nodes
             if w is not None:
-                if index in self.pw_queries and not sm:
-                    w = self.evaluate(index, sm=True)
-                    if w > 1:  
+                if index in self.pw_queries and not sm and index>0:
+                    n = self.evaluate(index, sm=True)
+                    print(index)
+                    if n > 1:  
                         norm = self.semiring.value(1/n)
                         w =  self.semiring.times(w[index < 0], norm)
                         return w
+                else:
+                    return w[index < 0]
                 # if index in self.multi_sm and not self.counting_sm:
                 #     n = self.multi_sm[index]
                 #     if n > 1:
                 #         norm = self.semiring.value(1/n)
                 #         w =  self.semiring.times(w[index < 0], norm)
                 #         return w
-                else:
-                    return w[index < 0]
-            cache.get(abs_index)  # Intermediate nodes
+                # else:
+                #     return w[index < 0]
+            w = cache.get(abs_index)  # Intermediate nodes
             if w is None:
-                w = self._calculate_weight(index)
+                w = self._calculate_weight(index, sm)
                 cache[abs_index] = w
             return w
 
@@ -189,13 +196,13 @@ class SimpleDDNNFEvaluator(Evaluator):
         :param value: value
         """
         if value:
-            pos = self._get_weight(index)
+            pos = self._get_weight(index, sm)
             self.set_weight(index, pos, self.semiring.zero(), sm)
         else:
-            neg = self._get_weight(-index)
+            neg = self._get_weight(-index,sm)
             self.set_weight(index, self.semiring.zero(), neg, sm)
 
-    def _calculate_weight(self, key):
+    def _calculate_weight(self, key, sm=False):
         assert key != 0
         assert key is not None
         # assert(key > 0)
@@ -207,7 +214,7 @@ class SimpleDDNNFEvaluator(Evaluator):
             return self.semiring.one()
         else:
             assert key > 0
-            childprobs = [self._get_weight(c) for c in node.children]
+            childprobs = [self._get_weight(c, sm) for c in node.children]
             # print(childprobs)
             if ntype == "conj":
                 p = self.semiring.one()
@@ -259,8 +266,8 @@ class SimpleDDNNFEvaluator(Evaluator):
     #             result = self.semiring.normalize(result, self._get_z())
     #     return self.semiring.result(result, self.formula)
 
-    def _reset_value(self, index, pos, neg):
-        self.set_weight(index, pos, neg)
+    def _reset_value(self, index, pos, neg, sm):
+        self.set_weight(index, pos, neg, sm)
 
     # Basic
     # def get_root_weight(self):
@@ -584,8 +591,9 @@ class SimpleDDNNFEvaluator(Evaluator):
         self.weights.clear()
         model_weights = self.formula.extract_weights(self.semiring, self.given_weights)
         self.weights = model_weights.copy()
-        self.sm_weights = {key:(1.0,1.0) for key in self.weights}
-        self.pw_queries = [(qname,id) for qname,id in self.formula.queries() if str(qname).startswith("_pw_")]
+        # self.sm_weights = {key:(1.0,1.0) for key in self.weights}
+        self.weights = {key:(1.0,1.0) for key in self.weights}
+        self.pw_queries = [id for qname,id in self.formula.queries() if str(qname).startswith("_pw_")]
 
         # self._initialize()
     # Basic:
@@ -729,7 +737,7 @@ def _compile_with_dsharp_asp(cnf, nnf=None, smooth=False, **kwdargs):
             smoothl = ['-smoothNNF']
         else:
             smoothl = ['']
-        cmd = ['dsharp_with_unfounded', '-Fnnf', nnf_file, '-smoothNNF',  cnf_file]
+        cmd = ['dsharp_with_unfounded', '-Fnnf', nnf_file,  cnf_file]
 
         try:
             result = _compile(cnf, cmd, cnf_file, nnf_file)
