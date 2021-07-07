@@ -53,7 +53,7 @@ from collections import defaultdict
 
 # Make sure the ProbLog module is on the path.
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../')))
-
+from problog.util import init_logger
 from problog.engine import DefaultEngine, ground
 from problog.evaluator import SemiringProbability
 from problog.logic import Term, Constant, Clause, AnnotatedDisjunction, Or
@@ -123,7 +123,7 @@ class LFIProblem(SemiringProbability, LogicProgram) :
         :return: example groups based on evidence atoms
         :rtype: dict of atoms : values for examples
         """
-    
+        logger = logging.getLogger("problog_lfi")
         # value can be True / False / None
         # ( atom ), ( ( value, ... ), ... ) 
 
@@ -142,6 +142,11 @@ class LFIProblem(SemiringProbability, LogicProgram) :
         logger = logging.getLogger('problog_lfi')
 
         baseprogram = DefaultEngine().prepare(self)
+        baseprogram.to_prolog()
+        logger.debug(
+            "\nBase Program:\n\t" + baseprogram.to_prolog().replace("\n", "\n\t")
+        )
+
         examples = self._process_examples()
 
         result = []
@@ -151,7 +156,7 @@ class LFIProblem(SemiringProbability, LogicProgram) :
             for example in example_group :
                 if self.verbose:
                     n += 1
-                    logger.debug('Compiling example %s ...' % n)
+                    logger.debug("\nCompiling example {}/{}".format(n, len(examples)))
 
                 ground_program = ground(baseprogram, ground_program,
                                         evidence=list(zip(atoms, example)))
@@ -325,7 +330,6 @@ class LFIProblem(SemiringProbability, LogicProgram) :
             self.output_names = self.names[:]
         else:
             process_atom = self._process_atom
-
         for clause in self.source:
             if isinstance(clause, Clause):
                 if clause.head.functor == 'query' and clause.head.arity == 1:
@@ -347,7 +351,7 @@ class LFIProblem(SemiringProbability, LogicProgram) :
 
     def _evaluate_examples( self ) :
         """Evaluate the model with its current estimates for all examples."""
-        
+        logging.getLogger("problog_lfi").debug("Evaluating examples:")
         results = []
         i = 0
         logging.getLogger('problog_lfi').debug('Evaluating examples ...')
@@ -365,6 +369,14 @@ class LFIProblem(SemiringProbability, LogicProgram) :
             p_evidence = evaluator.evaluate_evidence()
             i += 1
             results.append((p_evidence, p_queries))
+            logging.getLogger("problog_lfi").debug(
+                "Example "
+                + str(i + 1)
+                + "\tp_evidence = "
+                + str(p_evidence)
+                + "\tp_queries = "
+                + str(p_queries)
+            )
         return results
     
     def _update(self, results) :
@@ -452,12 +464,12 @@ def read_examples(*filenames):
                     yield atoms
     
     
-def run_lfi( program, examples, output_model=None, **kwdargs):
+def run_lfi( program, examples, output=None, **kwdargs):
     lfi = LFIProblem(program, examples, **kwdargs)
     score = lfi.run()
 
-    if output_model is not None:
-        with open(output_model, 'w') as f:
+    if output is not None:
+        with open(output, 'w') as f:
             f.write(lfi.get_model())
     return score, lfi.weights, lfi.names, lfi.iteration, lfi
 
@@ -469,10 +481,15 @@ def argparser():
     parser.add_argument('examples', nargs='+')
     parser.add_argument('-n', dest='max_iter', default=10000, type=int )
     parser.add_argument('-d', dest='min_improv', default=1e-10, type=float )
-    parser.add_argument('-O', '--output-model', type=str, default=None,
-                        help='write resulting model to given file')
-    parser.add_argument('-o', '--output', type=str, default=None,
-                        help='write output to file')
+    parser.add_argument(
+        "-o",
+        "--output",
+        dest="output",
+        type=str,
+        default=None,
+        help="write resulting model to given file",
+    )
+    parser.add_argument("--logger", type=str, default=None, help="write log to file")
     parser.add_argument('-k', '--knowledge', dest='koption', choices=get_evaluatables(),
                         default=None, help='knowledge compilation tool')
     parser.add_argument('-v', '--verbose', action='count', default=0)
@@ -503,13 +520,19 @@ def main(argv, result_handler=None):
 
     knowledge = get_evaluatable(args.koption)
 
-    if args.output_model is None:
-        outf = sys.stdout
+    if args.output is None:
+        outf = None
     else:
-        outf = open(args.output_model, 'w')
+        outf = open(args.output, 'w')
 
-    create_logger('problog_lfi', args.verbose)
-    create_logger('problog', args.verbose - 1)
+    if args.logger is None:
+        logf = None
+    else:
+        logf = open(args.logger, "w")
+
+    logger = init_logger(verbose=args.verbose, name="problog_lfi", out=logf)
+    # create_logger('problog_lfi', args.verbose)
+    # create_logger('problog', args.verbose - 1)
 
     program = PrologFile(args.model)
     examples = list(read_examples(*args.examples))
@@ -528,6 +551,7 @@ def main(argv, result_handler=None):
         retcode = result_handler((True, results), output=outf)
     except Exception as err:
         trace = traceback.format_exc()
+        logging.getLogger("problog_lfi").error("\nError encountered:\t\n" + trace)
         err.trace = trace
         retcode = result_handler((False, err), output=outf)
 
