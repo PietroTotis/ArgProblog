@@ -14,6 +14,7 @@ from .program import SimpleProgram, PrologString
 from .formula import LogicGraph
 from .constraint import ConstraintAD
 from .clausedb import ClauseDB
+import platform
 
 # add exception for unsupported elements of the language (lists, imports...)
 
@@ -49,15 +50,12 @@ def ground_gringo(model, target=None, queries=[], evidence=[], propagate_evidenc
             model = PrologString(model.to_prolog())
         converted = [statement_to_gringo(l, stmt) for l, stmt in enumerate(model)]
 
-        # print("In:")
-        # print('\n'.join([str(s) for s in model]) + '\n')
-        # print("Conv:")
-        # print('\n'.join(converted) + '\n')
 
         with open(fn_model, 'w') as f:
             f.write('\n'.join(converted) + '\n')
 
-        gringo_ground = os.path.join(os.path.dirname(__file__), 'bin', 'linux', 'gringo')
+        system = platform.system().lower()
+        gringo_ground = os.path.join(os.path.dirname(__file__), 'bin', system, 'gringo')
 
         cmd = [gringo_ground, '--keep-facts', fn_model]
 
