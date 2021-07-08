@@ -160,6 +160,18 @@ class LFIProblem(SemiringProbability, LogicProgram) :
 
                 ground_program = ground(baseprogram, ground_program,
                                         evidence=list(zip(atoms, example)))
+                logger.debug(
+                    "\t"
+                    + "New ground_program:\n\t\t"
+                    + str(ground_program).replace("\n", "\n\t\t")
+                )
+
+                logger.debug(
+                    "\t"
+                    + "New ground_program problog:\n\t\t"
+                    + ground_program.to_prolog().replace("\n", "\n\t\t")
+                )
+
                 compiled_program = self.knowledge.create_from(ground_program)
                 result.append((atoms, example, compiled_program))
         self._compiled_examples = result
