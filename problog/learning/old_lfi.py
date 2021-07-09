@@ -352,22 +352,22 @@ class LFIProblem(SemiringProbability, LogicProgram):
         else:
             process_atom = self._process_atom
 
-        if self.output_mode is False:
-            getLogger("problog_lfi").debug("\nProcessed Atoms:")
+        # if self.output_mode is False:
+        #     getLogger("problog_lfi").debug("\nProcessed Atoms:")
         for clause in self.source:
             if isinstance(clause, Clause):
                 if clause.head.functor == 'query' and clause.head.arity == 1:
                     continue
                 extra_clauses = process_atom(clause.head, clause.body)
                 for extra in extra_clauses:
-                    if self.output_mode is False:
-                        getLogger("problog_lfi").debug("\t" + str(extra))
+                    # if self.output_mode is False:
+                    #     getLogger("problog_lfi").debug("\t" + str(extra))
                     yield extra
             elif isinstance(clause, AnnotatedDisjunction):
                 extra_clauses = process_atom(Or.from_list(clause.heads), clause.body)
                 for extra in extra_clauses:
-                    if self.output_mode is False:
-                        getLogger("problog_lfi").debug("\t" + str(extra))
+                    # if self.output_mode is False:
+                    #     getLogger("problog_lfi").debug("\t" + str(extra))
                     yield extra
             else:
                 if clause.functor == 'query' and clause.arity == 1:
@@ -375,8 +375,8 @@ class LFIProblem(SemiringProbability, LogicProgram):
                 # Fact
                 extra_clauses = process_atom(clause, None)
                 for extra in extra_clauses:
-                    if self.output_mode is False:
-                        getLogger("problog_lfi").debug("\t" + str(extra))
+                    # if self.output_mode is False:
+                    #     getLogger("problog_lfi").debug("\t" + str(extra))
                     yield extra
 
     def _evaluate_examples(self):
