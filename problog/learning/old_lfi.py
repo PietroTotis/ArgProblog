@@ -48,6 +48,7 @@ import os
 import random
 import math
 import logging
+from logging import getLogger
 
 from collections import defaultdict
 
@@ -123,7 +124,7 @@ class LFIProblem(SemiringProbability, LogicProgram):
         :return: example groups based on evidence atoms
         :rtype: dict of atoms : values for examples
         """
-        logger = logging.getLogger("problog_lfi")
+        logger = getLogger("problog_lfi")
         # value can be True / False / None
         # ( atom ), ( ( value, ... ), ... )
 
@@ -143,7 +144,7 @@ class LFIProblem(SemiringProbability, LogicProgram):
 
         :param examples: Output of ::func::`process_examples`.
         """
-        logger = logging.getLogger('problog_lfi')
+        logger = getLogger('problog_lfi')
 
         baseprogram = DefaultEngine().prepare(self)
         baseprogram.to_prolog()
@@ -350,16 +351,23 @@ class LFIProblem(SemiringProbability, LogicProgram):
             self.output_names = self.names[:]
         else:
             process_atom = self._process_atom
+
+        if self.output_mode is False:
+            getLogger("problog_lfi").debug("\nProcessed Atoms:")
         for clause in self.source:
             if isinstance(clause, Clause):
                 if clause.head.functor == 'query' and clause.head.arity == 1:
                     continue
                 extra_clauses = process_atom(clause.head, clause.body)
                 for extra in extra_clauses:
+                    if self.output_mode is False:
+                        getLogger("problog_lfi").debug("\t" + str(extra))
                     yield extra
             elif isinstance(clause, AnnotatedDisjunction):
                 extra_clauses = process_atom(Or.from_list(clause.heads), clause.body)
                 for extra in extra_clauses:
+                    if self.output_mode is False:
+                        getLogger("problog_lfi").debug("\t" + str(extra))
                     yield extra
             else:
                 if clause.functor == 'query' and clause.arity == 1:
@@ -367,20 +375,22 @@ class LFIProblem(SemiringProbability, LogicProgram):
                 # Fact
                 extra_clauses = process_atom(clause, None)
                 for extra in extra_clauses:
+                    if self.output_mode is False:
+                        getLogger("problog_lfi").debug("\t" + str(extra))
                     yield extra
 
     def _evaluate_examples(self):
         """Evaluate the model with its current estimates for all examples."""
-        logging.getLogger("problog_lfi").debug("Evaluating examples:")
+        getLogger("problog_lfi").debug("Evaluating examples:")
         results = []
         i = 0
-        logging.getLogger('problog_lfi').debug('Evaluating examples ...')
+        getLogger('problog_lfi').debug('Evaluating examples ...')
         for at, val, comp in self._compiled_examples:
             evidence = dict(zip(at, val))
             try:  # WIP
                 evaluator = comp.get_evaluator(semiring=self, evidence=evidence)
             except:
-                logging.getLogger('problog_lfi').warning(
+                getLogger('problog_lfi').warning(
                     "Ignoring example {}/{}".format(i+1, len(self.examples))
                 )
                 continue
@@ -395,7 +405,7 @@ class LFIProblem(SemiringProbability, LogicProgram):
             p_evidence = evaluator.evaluate_evidence()
             i += 1
             results.append((p_evidence, p_queries))
-            logging.getLogger("problog_lfi").debug(
+            getLogger("problog_lfi").debug(
                 "Example "
                 + str(i)
                 + "\tp_evidence = "
@@ -447,13 +457,13 @@ class LFIProblem(SemiringProbability, LogicProgram):
 
     def run(self):
         self.prepare()
-        logging.getLogger('problog_lfi').info('Weights to learn: %s' % self.names)
-        logging.getLogger('problog_lfi').info('Initial weights: %s' % self.weights)
+        getLogger('problog_lfi').info('Weights to learn: %s' % self.names)
+        getLogger('problog_lfi').info('Initial weights: %s' % self.weights)
         delta = 1000
         prev_score = -1e10
         while self.iteration < self.max_iter and (delta < 0 or delta > self.min_improv):
             score = self.step()
-            logging.getLogger('problog_lfi').info('Weights after iteration %s: %s' % (self.iteration, self.weights))
+            getLogger('problog_lfi').info('Weights after iteration %s: %s' % (self.iteration, self.weights))
             delta = score - prev_score
             prev_score = score
         return prev_score
@@ -530,7 +540,7 @@ def argparser():
 def create_logger(name, verbose):
     levels = [logging.WARNING, logging.INFO, logging.DEBUG] + list(range(9, 0, -1))
     verbose = max(0, min(len(levels) - 1, verbose))
-    logger = logging.getLogger(name)
+    logger = getLogger(name)
     ch = logging.StreamHandler(sys.stdout)
     formatter = logging.Formatter('[%(levelname)s] %(message)s')
     ch.setFormatter(formatter)
@@ -567,9 +577,9 @@ def main(argv, result_handler=None):
     program = PrologFile(args.model)
     examples = list(read_examples(*args.examples))
     if len(examples) == 0:
-        logging.getLogger('problog_lfi').warn('no examples specified')
+        getLogger('problog_lfi').warn('no examples specified')
     else:
-        logging.getLogger('problog_lfi').info('Number of examples: %s' % len(examples))
+        getLogger('problog_lfi').info('Number of examples: %s' % len(examples))
     options = vars(args)
     del options['examples']
 
@@ -581,7 +591,7 @@ def main(argv, result_handler=None):
         retcode = result_handler((True, results), output=outf)
     except Exception as err:
         trace = traceback.format_exc()
-        logging.getLogger("problog_lfi").error("\nError encountered:\t\n" + trace)
+        getLogger("problog_lfi").error("\nError encountered:\t\n" + trace)
         err.trace = trace
         retcode = result_handler((False, err), output=outf)
 
