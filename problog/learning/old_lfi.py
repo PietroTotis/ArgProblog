@@ -143,7 +143,7 @@ class LFIProblem(SemiringProbability, LogicProgram) :
 
         baseprogram = DefaultEngine().prepare(self)
         baseprogram.to_prolog()
-        
+
 
         logger.debug(
             "\tBase Program problog:\n\t\t"
