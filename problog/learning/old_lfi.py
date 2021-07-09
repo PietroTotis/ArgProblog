@@ -143,8 +143,16 @@ class LFIProblem(SemiringProbability, LogicProgram) :
 
         baseprogram = DefaultEngine().prepare(self)
         baseprogram.to_prolog()
+        
+
         logger.debug(
-            "\nBase Program:\n\t" + baseprogram.to_prolog().replace("\n", "\n\t")
+            "\tBase Program problog:\n\t\t"
+            + str(baseprogram).replace("\n", "\n\t\t")
+        )
+
+        logger.debug(
+            "\tBase Program:\n\t\t"
+            + baseprogram.to_prolog().replace("\n", "\n\t\t")
         )
 
         examples = self._process_examples()
