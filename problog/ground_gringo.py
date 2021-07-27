@@ -450,7 +450,7 @@ class SmodelsParser:
     
     def parse_special(self, head, b_pos_terms, b_neg_terms):
         q = Term.from_string(self.names[head])
-        b_pos_terms = b_pos_terms[1:] # ignore extra safety predicate
+        b_pos_terms = b_pos_terms[:-1] # ignore extra safety predicate
         body = b_pos_terms + b_neg_terms
         if len(body) == 0:
             r = Term.from_string(self.names[head])
