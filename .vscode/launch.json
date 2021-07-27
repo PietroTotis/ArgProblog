@@ -11,7 +11,9 @@
             "request": "launch",
             "program": "problog-cli.py",
             "console": "integratedTerminal",
-            "args" : ["lfi", "-n", "100",  "/media/windows/Users/pietr/Desktop/PhD/Problogs/ASP-Problog/test/learning/4.pl","/media/windows/Users/pietr/Desktop/PhD/Problogs/ASP-Problog/test/learning/4.ev", "-v", "-v", "-v", "-v", "-v"]
+            "args" : ["ground","/media/windows/Users/pietr/Desktop/PhD/Problogs/ASP-Problog/test/grounding/cycle2.pl",  "-v", "-v", "-v", "-v", "-v"]
+            // "args" : ["sample", "-n", "100", "/media/windows/Users/pietr/Desktop/PhD/Problogs/ASP-Problog/test/args.pl"]
+            // "args" : ["lfi", "-n", "100",  "/media/windows/Users/pietr/Desktop/PhD/Problogs/ASP-Problog/test/learning/4.pl","/media/windows/Users/pietr/Desktop/PhD/Problogs/ASP-Problog/test/learning/4.ev", "-v", "-v", "-v", "-v", "-v"]
             // "args" : ["--nologspace","/media/windows/Users/pietr/Desktop/PhD/Problogs/ASP-Problog/test/learning/base.pl"]
             // "args" : ["lfi", "-n", "100",  "/media/windows/Users/pietr/Desktop/PhD/Problogs/ASP-Problog/test/learning/3.pl","/media/windows/Users/pietr/Desktop/PhD/Problogs/ASP-Problog/test/learning/2.ev", "-v", "-v", "-v", "-v", "-v"]
             // "args" : ["--nologspace","/media/windows/Users/pietr/Desktop/PhD/Problogs/ASP-Problog/test/simple_neg_cycle/mixed.pl"]

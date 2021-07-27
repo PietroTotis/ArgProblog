@@ -1,0 +1,8 @@
+% Learned Model:
+1.0::a.
+1.0::b :- a.
+
+% Score = 0.0
+% Tunable Clauses = [t(0.5)::a, t(0.5)::b]
+% Learned Weights = [1.0, 1.0]
+% Number of iterations taken for convergence = 3

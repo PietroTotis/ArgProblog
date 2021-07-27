@@ -53,20 +53,20 @@ def ground(model, target=None, grounder=None, **kwdargs):
     return ground_gringo(model, target, **kwdargs)
 
 # @transform(LogicProgram, LogicFormula)
-# def ground(model, target=None, grounder=None, **kwdargs):
-#     """Ground a given model.
+def ground(model, target=None, grounder=None, **kwdargs):
+    """Ground a given model.
 
-#     :param model: logic program to ground
-#     :type model: LogicProgram
-#     :return: the ground program
-#     :rtype: LogicFormula
-#     """
-#     if grounder in ("yap", "yap_debug"):
-#         from .ground_yap import ground_yap
+    :param model: logic program to ground
+    :type model: LogicProgram
+    :return: the ground program
+    :rtype: LogicFormula
+    """
+    if grounder in ("yap", "yap_debug"):
+        from .ground_yap import ground_yap
 
-#         return ground_yap(model, target, **kwdargs)
-#     else:
-#         return ground_default(model, target, **kwdargs)
+        return ground_yap(model, target, **kwdargs)
+    else:
+        return ground_default(model, target, **kwdargs)
 
 
 @transform(LogicProgram, LogicFormula)
