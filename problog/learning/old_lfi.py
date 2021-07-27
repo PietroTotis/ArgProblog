@@ -185,7 +185,8 @@ class LFIProblem(SemiringProbability, LogicProgram):
 
                     compiled_program = self.knowledge.create_from(ground_program)
                     result.append((atoms, example, compiled_program))
-                except:
+                except Exception as e:
+                    print(e)
                     logger.warning(
                         "Ignoring example {}/{}".format(n, len(self.examples))
                     )

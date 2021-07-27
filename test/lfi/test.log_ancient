@@ -1,68 +1,29 @@
-[LVL7] Output level: 7
-[INFO] Number of examples: 1
-[DEBUG] 	Base Program problog:
-[DEBUG] 		0: fact(functor='lfi_fact_0', args=(), probability=lfi(0), location=None)
-[DEBUG] 		1: define(functor='lfi_fact_0', arity=0, children=[0], location=None)
-[DEBUG] 		2: call(functor='lfi_fact_0', args=(), defnode=1, location=None, op_priority=None, op_spec=None)
-[DEBUG] 		3: clause(functor='a', args=(), probability=None, child=2, varcount=0, locvars=set(), group=None, location=(0, 9))
-[DEBUG] 		4: define(functor='a', arity=0, children=[3], location=(0, 9))
-[DEBUG] 		5: fact(functor='query', args=(lfi_fact_0,), probability=None, location=None)
-[DEBUG] 		6: define(functor='query', arity=1, children=[5, 15], location=None)
-[DEBUG] 		7: fact(functor='lfi_fact_1', args=(), probability=lfi(1), location=None)
-[DEBUG] 		8: define(functor='lfi_fact_1', arity=0, children=[7], location=None)
-[DEBUG] 		9: call(functor='a', args=(), defnode=4, location=(0, 26), op_priority=None, op_spec=None)
-[DEBUG] 		10: call(functor='lfi_fact_1', args=(), defnode=8, location=None, op_priority=None, op_spec=None)
-[DEBUG] 		11: conj(children=(9, 10), location=None)
-[DEBUG] 		12: clause(functor='b', args=(), probability=None, child=11, varcount=0, locvars=set(), group=None, location=(0, 21))
-[DEBUG] 		13: define(functor='b', arity=0, children=[12], location=(0, 21))
-[DEBUG] 		14: call(functor='a', args=(), defnode=4, location=(0, 26), op_priority=None, op_spec=None)
-[DEBUG] 		15: clause(functor='query', args=(lfi_fact_1,), probability=None, child=14, varcount=0, locvars=set(), group=None, location=None)
-[DEBUG] 		{'lfi_fact_0/0': 1, 'a/0': 4, 'query/1': 6, 'lfi_fact_1/0': 8, 'b/0': 13}
-[DEBUG] 		Redirects: {}
-[DEBUG] 	Base Program:
-[DEBUG] 		lfi(0)::lfi_fact_0.
-[DEBUG] 		a :- lfi_fact_0.
-[DEBUG] 		query(lfi_fact_0).
-[DEBUG] 		lfi(1)::lfi_fact_1.
-[DEBUG] 		b :- a, lfi_fact_1.
-[DEBUG] 		query(lfi_fact_1) :- a.
-[DEBUG] 		
+Base Program:
+                lfi(0)::lfi_fact_0.
+                a :- lfi_fact_0.
+                query(lfi_fact_0).
+                lfi(1)::lfi_fact_1.
+                b :- a, lfi_fact_1.
+                query(lfi_fact_1) :- a.
+
 [DEBUG] 
-[DEBUG] Compiling example 1/1
-[DEBUG] 	New ground_program:
-[DEBUG] 		1: disj(children=(3,), name=a)
-[DEBUG] 		2: disj(children=(5,), name=b)
-[DEBUG] 		3: atom(identifier=lfi_fact_0, probability=lfi(0), group=None, name=lfi_fact_0, source=None)
-[DEBUG] 		4: atom(identifier=lfi_fact_1, probability=lfi(1), group=None, name=lfi_fact_1, source=None)
-[DEBUG] 		5: conj(children=(1, 4), name=None)
-[DEBUG] 		Queries : 
-[DEBUG] 		* lfi_fact_0 : 3 [query]
-[DEBUG] 		* query(lfi_fact_1) : 0 [query]
-[DEBUG] 		Evidence : 
-[DEBUG] 		* a : 1
-[DEBUG] 		* b : -2
-[DEBUG] 		
-[DEBUG] 	New ground_program problog:
-[DEBUG] 		a :- lfi_fact_0.
-[DEBUG] 		b :- a, lfi_fact_1.
-[DEBUG] 		lfi(0)::lfi_fact_0.
-[DEBUG] 		lfi(1)::lfi_fact_1.
-[DEBUG] 		query(lfi_fact_0).
-[DEBUG] 		query(lfi_fact_1).
-[DEBUG] 		query(query(lfi_fact_1)).
-[DEBUG] 		evidence(a).
-[DEBUG] 		evidence(\+b).
-[INFO] Weights to learn: [t(0.5)::a, t(0.5)::b]
-[INFO] Initial weights: [0.5, 0.5]
-[DEBUG] Evaluating examples:
-[DEBUG] Evaluating examples ...
-[DEBUG] Example 1	p_evidence = 0.25	p_queries = {lfi_fact_0: 1.0, query(lfi_fact_1): 1.0}
-[INFO] Weights after iteration 1: [1.0, 1.0]
-[DEBUG] Evaluating examples:
-[DEBUG] Evaluating examples ...
-[WARNING] Ignoring example 1/1
-[INFO] Weights after iteration 2: [1.0, 1.0]
-[DEBUG] Evaluating examples:
-[DEBUG] Evaluating examples ...
-[WARNING] Ignoring example 1/1
-[INFO] Weights after iteration 3: [1.0, 1.0]
+Compiling example 1/1
+[DEBUG]         New ground_program:
+                1: atom(identifier=0, probability=lfi(0), group=None, name=a, source=None)
+                2: atom(identifier=7, probability=lfi(1), group=None, name=lfi_fact_1, source=None)
+                3: conj(children=(1, 2), name=b)
+                Queries : 
+                * lfi_fact_0 : 1
+                * lfi_fact_1 : 2
+                Evidence : 
+                * a : 1
+                * b : -3
+
+[DEBUG]         New ground_program problog:
+                lfi(0)::a.
+                lfi(1)::lfi_fact_1.
+                b :- a, lfi_fact_1.
+                query(lfi_fact_0).
+                query(lfi_fact_1).
+                evidence(a).
+                evidence(\+b)

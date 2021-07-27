@@ -663,9 +663,12 @@ class SmodelsParser:
                 val = LogicGraph.LABEL_EVIDENCE_POS
             lf.add_evidence(e_term.with_probability(), id, val)
         
+        # ids = []
         for e, val in self.given_evidence:
             id = self.get_or_add(lf, e)
             lf.add_evidence(e, id, val, keep_name=True)
+            # ids.append(id)
+        # lf.propagate(ids)
 
         # Queries
         for q_id in self.queries:
