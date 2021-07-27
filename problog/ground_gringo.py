@@ -670,6 +670,8 @@ class SmodelsParser:
         # Queries
         for q_id in self.queries:
             q = self.queries[q_id]
+            if isinstance(q, Clause):
+                q = q.head
             q_term = q.args[0]
             id = self.get_or_add(lf, q_term)
             lf.add_query(q_term, id)
