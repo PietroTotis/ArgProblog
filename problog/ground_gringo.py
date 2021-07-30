@@ -656,7 +656,7 @@ class SmodelsParser:
             e = self.evidence[e_id]
             e_term =  e.args[0]
             id = self.get_or_add(lf, e_term)
-            if isinstance(e_term, Not) or e.args[1] == Term('false'):
+            if isinstance(e_term, Not) or len(e.args)>1 and e.args[1] == Term('false'):
                 val = LogicGraph.LABEL_EVIDENCE_NEG
                 id = -id
             else:

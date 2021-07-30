@@ -292,7 +292,7 @@ class SimpleDDNNFEvaluator(Evaluator):
             childprobs = [self._get_weight(c) for c in node.children]
             # print(key, childprobs, len(self.multi_sm))
             if ntype == "conj":
-                if len(self.multi_sm) == 0:
+                if len(self.multi_sm) == 0: # no multiple stable models: aggregate without normalization
                     c = self.semiring.one()
                     for p in childprobs:
                         c = self.semiring.times(c, p[0])
@@ -300,14 +300,14 @@ class SimpleDDNNFEvaluator(Evaluator):
                 else:  
                     w_conj = list(self.wproduct(childprobs))
                     n_children = len(w_conj)
-                    if key in self.keyworlds:
+                    if key in self.keyworlds:   # if we have to normalize something
                         worlds = self.keyworlds[key]
-                        for c in range(0, n_children):
+                        for c in range(0, n_children): # follow the list
                             pw = frozenset(worlds[c])
-                            n = self.multi_sm.get(pw,1)
+                            n = self.multi_sm.get(pw,1) # get normalization constant
                             if n!=1 and not self.semiring.is_zero(w_conj[c]):
                                 norm = self.semiring.value(1/n)
-                                w_conj[c] = self.semiring.times(w_conj[c],norm)
+                                w_conj[c] = self.semiring.times(w_conj[c],norm) # replace with normalized
                     return w_conj
             elif ntype == "disj":
                 if len(self.multi_sm) == 0:
@@ -382,7 +382,7 @@ class SimpleDDNNFEvaluator(Evaluator):
     #         else:
     #             raise TypeError("Unexpected node type: '%s'." % ntype)
 
-    def get_worlds(self, key, n_choices):
+    def get_worlds(self, key):
         if key == 0 or key is None:
             return [[]]
 
@@ -390,32 +390,32 @@ class SimpleDDNNFEvaluator(Evaluator):
         ntype = type(node).__name__
 
         if ntype == 'atom':
-            if node.probability != True and node.probability is not None: #?
+            # keep track of logical and probabilistic atoms
+            if abs(key) in self.labelled or abs(key) in self.choices:
                 return [[key]]
-            else:
+            else: #ignore extra stuff from compiler
                 return [[]]
         else:
             assert key > 0
-            childworlds = [self.get_worlds(c, n_choices) for c in node.children]
+            childworlds = [self.get_worlds(c) for c in node.children]
             # print("cws:", key, childworlds)
             if ntype == 'conj':
                 cw_conj = list(self.product(childworlds))
                 # print("cj:", key,  cw_conj)
-                for i, w in enumerate(cw_conj):
-                    if len(w) == n_choices:
-                        cw_conj[i] = []
-                        fw = frozenset(w)
-                        if key in self.keyworlds:
+                for i, w in enumerate(cw_conj): # if the conjunction corresponds to some pw
+                    if self.choices.issubset(self.chosen(w)): # and we made all probabilistic choices
+                        cw_conj[i] = [] # forget about it when handing list to the partent
+                        pw = [id for id in w if abs(id) in self.choices]
+                        fw = frozenset(pw)
+                        if key in self.keyworlds:   # remember that on this node we might need some normalization
                             self.keyworlds[key].append(fw)
                         else:
                             self.keyworlds[key] = [fw]
-                # if len(cw_conj) > 0 and len(cw_conj[0]) == n_choices:
-                #     self.keyworlds[key] = [frozenset(w) for w in cw_conj]
-                return cw_conj
+                return cw_conj  # this contains partial worlds
             elif ntype == 'disj':
                 disj = []
                 for cws in childworlds:
-                    disj += [w for w in cws if len(w) < n_choices or n_choices==1]
+                    disj += [w for w in cws if self.partial_choice(w)] # just flatten or 
                 # print("dws:", disj)
                 return disj
             else:
@@ -437,6 +437,16 @@ class SimpleDDNNFEvaluator(Evaluator):
                 for prod in self.wproduct(ar_list[1:]):
                     yield self.semiring.times(w, prod)
 
+    def subset_diff(self,a,b):
+        return a.issubset(b) and a != b
+
+    def chosen(self, world):
+        return set([abs(id) for id in world])
+
+    def partial_choice(self, world):
+        chosen_facts = self.chosen(world) & self.choices
+        return self.subset_diff(chosen_facts, self.choices)
+
     # def pwproduct(self, ar_list):
     #     if not ar_list:
     #         yield ([], self.semiring.one())
@@ -446,31 +456,27 @@ class SimpleDDNNFEvaluator(Evaluator):
     #                 yield (w+wprod, self.semiring.times(p, pprod))
 
     def multi_stable_models(self):
+        self.labelled = [id for _, id, _ in self.formula.labeled()] # logical and probabilistic atoms
         weights = self.formula.get_weights()
-        choices = [key for key in weights if isinstance(weights[key],Constant)]
-        n_choices = len(choices)
-        # print(choices, n_choices)
+        self.choices = set([key for key in weights if not isinstance(weights[key], bool)])
         root = len(self.formula._nodes)
-        # n_choices = len([w for w in self.formula.get_weights().values() if isinstance(w,Constant)])
-        # print(choices)
-        # root = len(self.formula._nodes)
-        # paths = {key: self.get_paths(root, key) for key in choices}
-        # print(paths)
+        # print(weights)
+        # print(self.labelled)
+        # print(self.choices)
 
-        # self.multi_sm = Counter()
-        # pws = [[]]
-        # self.get_worlds(root, pws, n_choices)
-
-        self.get_worlds(root, n_choices)
+        ws = self.get_worlds(root)  
+        n_models = len(ws)  
         worlds = [w for ws in self.keyworlds.values() for w in ws]
         self.multi_sm = Counter(worlds)
+        # if the number of models is a multiple of the total number from the counter
+        # then there must be some non-probabilistic choice in each world
+        # then normalize each world w.r.t. that number
+        n_pws = sum(self.multi_sm.values())
+        n_logic_choices = n_models / n_pws
+
+        self.multi_sm = {k: c*n_logic_choices for k, c in self.multi_sm.items() if c>1 or n_logic_choices>1}
+        # print(self.keyworlds)
         # print(self.multi_sm)
-        # if len(self.multi_sm) > 0:
-        #     _, min_count = self.multi_sm.most_common()[-1]
-        self.multi_sm = {k: c for k, c in self.multi_sm.items() if c>1}
-            # self.multi_sm = {k: c/min_count for k, c in self.multi_sm.items() if c/min_count>1}
-        # print(self.multi_sm, len(self.multi_sm))
-        # print("")
 
 class Compiler(object):
     """Interface to CNF to d-DNNF compiler tool."""
