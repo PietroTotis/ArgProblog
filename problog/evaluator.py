@@ -575,7 +575,6 @@ class Evaluatable(ProbLogObject):
          If index is ``None`` (all queries) then the result is a dictionary of name to value.
         """
         evaluator = self.get_evaluator(semiring, evidence, weights, **kwargs)
-
         if index is None:
             result = {}
             # Probability of query given evidence

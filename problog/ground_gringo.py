@@ -14,6 +14,7 @@ from .program import SimpleProgram, PrologString
 from .formula import LogicGraph
 from .constraint import ConstraintAD
 from .clausedb import ClauseDB
+import platform
 
 # add exception for unsupported elements of the language (lists, imports...)
 
@@ -49,15 +50,12 @@ def ground_gringo(model, target=None, queries=[], evidence=[], propagate_evidenc
             model = PrologString(model.to_prolog())
         converted = [statement_to_gringo(l, stmt) for l, stmt in enumerate(model)]
 
-        # print("In:")
-        # print('\n'.join([str(s) for s in model]) + '\n')
-        # print("Conv:")
-        # print('\n'.join(converted) + '\n')
 
         with open(fn_model, 'w') as f:
             f.write('\n'.join(converted) + '\n')
 
-        gringo_ground = os.path.join(os.path.dirname(__file__), 'bin', 'linux', 'gringo')
+        system = platform.system().lower()
+        gringo_ground = os.path.join(os.path.dirname(__file__), 'bin', system, 'gringo')
 
         cmd = [gringo_ground, '--keep-facts', fn_model]
 
@@ -452,7 +450,7 @@ class SmodelsParser:
     
     def parse_special(self, head, b_pos_terms, b_neg_terms):
         q = Term.from_string(self.names[head])
-        b_pos_terms = b_pos_terms[1:] # ignore extra safety predicate
+        b_pos_terms = b_pos_terms[:-1] # ignore extra safety predicate
         body = b_pos_terms + b_neg_terms
         if len(body) == 0:
             r = Term.from_string(self.names[head])
@@ -658,20 +656,25 @@ class SmodelsParser:
             e = self.evidence[e_id]
             e_term =  e.args[0]
             id = self.get_or_add(lf, e_term)
-            if isinstance(e_term, Not) or e.args[1] == Term('false'):
+            if isinstance(e_term, Not) or len(e.args)>1 and e.args[1] == Term('false'):
                 val = LogicGraph.LABEL_EVIDENCE_NEG
                 id = -id
             else:
                 val = LogicGraph.LABEL_EVIDENCE_POS
             lf.add_evidence(e_term.with_probability(), id, val)
         
+        # ids = []
         for e, val in self.given_evidence:
             id = self.get_or_add(lf, e)
             lf.add_evidence(e, id, val, keep_name=True)
+            # ids.append(id)
+        # lf.propagate(ids)
 
         # Queries
         for q_id in self.queries:
             q = self.queries[q_id]
+            if isinstance(q, Clause):
+                q = q.head
             q_term = q.args[0]
             id = self.get_or_add(lf, q_term)
             lf.add_query(q_term, id)
