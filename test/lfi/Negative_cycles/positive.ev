@@ -1,0 +1,13 @@
+evidence(a).
+evidence(b).
+-----
+evidence(a).
+-----
+evidence(a).
+-----
+evidence(a).
+-----
+evidence(a).
+-----
+evidence(a).
+-----
