@@ -839,7 +839,7 @@ class LFIProblem(LogicProgram):
         fact_body = defaultdict(int)
         fact_par = defaultdict(int)
 
-        # score = 0.0
+        score = 0.0
         for m, pEvidence, result in results:
             par_marg = dict()
             for fact, value in result.items():
@@ -859,6 +859,10 @@ class LFIProblem(LogicProgram):
 
             for index, value in par_marg.items():
                 fact_par[index] += value * m
+            try:
+                score += math.log(pEvidence)
+            except ValueError:
+                logger.debug("Pr(evidence) == 0.0")
 
         update_list = fact_body
 
@@ -872,18 +876,18 @@ class LFIProblem(LogicProgram):
                     d[w] = False
                 weight_changed.append(d)
 
-        score = 0.0
+        # score = 0.0
         for index in update_list:
             if float(fact_body[index]) <= 10**-15:
                 # if close to zero
                 prob = 0.0
             else:
                 prob = float(fact_body[index]) / float(fact_par[index])
-                try:
-                    score += math.log(prob)
-                except ValueError as ex:
-                    # prob too close to zero
-                    pass
+                # try:
+                #     score += math.log(prob)
+                # except ValueError as ex:
+                #     # prob too close to zero
+                #     pass
 
             logger.debug(
                 "Update probabilistic fact {}: {} / {} = {}".format(
