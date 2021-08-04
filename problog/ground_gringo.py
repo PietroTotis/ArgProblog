@@ -540,7 +540,6 @@ class SmodelsParser:
                 #     # ft = f.with_args(*f.args, p=True)
                     self.facts[f_id] = [f]
 
-        print(self.probs)
         for f_id in self.gringo_facts: # re-associate probabilities with rules
             f = self.gringo_facts[f_id]
             self.gringo_facts_counter[f_id] = 0
