@@ -48,8 +48,11 @@ def ground_gringo(model, target=None, queries=[], evidence=[], propagate_evidenc
 
         if isinstance(model, ClauseDB): # awful but need to go back from clausedb to a problog program
             model = PrologString(model.to_prolog())
+
         converted = [statement_to_gringo(l, stmt) for l, stmt in enumerate(model)]
 
+        # for s in converted:
+        #     print(s)
 
         with open(fn_model, 'w') as f:
             f.write('\n'.join(converted) + '\n')
@@ -161,7 +164,7 @@ def probabilistic_rule_to_gringo(cl,line):
     new_fact = Term(name)
     det_rule = Clause(h,And(new_fact, cl.body))
     stmt_str += "%s.\n" % str(det_rule)
-    stmt_str += "%s.\n" % str(new_fact)
+    stmt_str += "%s.\n" % f"0{{ {name } }}1"    # choice of including or not the rule with probability
     stmt_str += probability_to_gringo(new_fact, cl.head.probability, line)
     return stmt_str
     
@@ -282,6 +285,8 @@ class SmodelsParser:
         self.names = defaultdict(int)
 
         self.facts = defaultdict(int)
+        self.gringo_facts = defaultdict(int)
+        self.gringo_facts_counter = {}
         self.queries = defaultdict(int)
         self.evidence = defaultdict(int)
         self.base_rules = defaultdict(int)
@@ -345,7 +350,19 @@ class SmodelsParser:
                 atom = literal.child
                 id = -logic_graph.get_node_by_name(atom.with_probability())
             else:
-                id = logic_graph.get_node_by_name(literal.with_probability())
+                if literal.functor.startswith("gringo"):
+                    # if it is a rule probability use new atom every time
+                    for id, t in self.gringo_facts.items():
+                        if literal.functor == t.functor:
+                            lit_with_prob = (id, t)
+                    gid, t = lit_with_prob
+                    # prob = self.gringo_facts[literal]
+                    n = self.gringo_facts_counter[gid] 
+                    name = Term(t.functor + f"_{n}")
+                    id = logic_graph.add_atom(t.with_args(n), t.probability, name=name)
+                    self.gringo_facts_counter[gid] += 1
+                else:
+                    id = logic_graph.get_node_by_name(literal.with_probability())
         except KeyError:
             id = self.add_literal(logic_graph, literal)
         return id
@@ -497,16 +514,20 @@ class SmodelsParser:
         '''
         for f_id in self.raw_facts:
             f_name = self.lookup_name(f_id)
-            self.facts[f_id] = Term.from_string(f_name)
+            f_term = Term.from_string(f_name)
+            if f_name.startswith("gringo"):
+                self.gringo_facts[f_id] = f_term
+            else:
+                self.facts[f_id] = f_term
         for head in sorted(self.raw_rules.keys()):
             for raw_rule in self.raw_rules[head]:
                 self.parse_rule(raw_rule)
         for raw_choice_rule in self.raw_choice_rules:
                 self.parse_ad_rule(raw_choice_rule)
 
-        for f_id in list(self.facts.keys()): # re-associate probabilities with facts
+        for f_id in self.facts: # re-associate probabilities with facts
             f = self.facts[f_id]
-            if f_id in self.probs.keys():
+            if f_id in self.probs:
                 self.facts[f_id] = []
                 for p in self.probs[f_id]:
                     prob, line = p
@@ -518,6 +539,13 @@ class SmodelsParser:
                 else: # no probability found: fact
                 #     # ft = f.with_args(*f.args, p=True)
                     self.facts[f_id] = [f]
+
+        print(self.probs)
+        for f_id in self.gringo_facts: # re-associate probabilities with rules
+            f = self.gringo_facts[f_id]
+            self.gringo_facts_counter[f_id] = 0
+            prob, line = self.probs[f_id][0]
+            self.gringo_facts[f_id] = f.with_args(*f.args, p=prob)
 
         for ad_line in self.annotated_disjunctions: # re-associate probabilities with annotated disjunctions
             for ad in self.annotated_disjunctions[ad_line]:
