@@ -647,7 +647,7 @@ def _compile(cnf, cmd, cnf_file, nnf_file):
                 #     subprocess_check_call(cmd, stdout=OUT_NULL)
                 i = out.find("# of solutions:")
                 j = out.find("#SAT")
-                n_models = int(out[i+17:j])
+                n_models = float(out[i+17:j])
                 success = True
             except subprocess.CalledProcessError as err:
                 attempts_left -= 1
