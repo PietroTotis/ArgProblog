@@ -11,7 +11,7 @@
             "request": "launch",
             "program": "problog-cli.py",
             "console": "integratedTerminal",
-            "args" : ["lfi", "-n", "100",  "/media/windows/Users/pietr/Desktop/PhD/Experiments/learning/test2/test_param.pl","/media/windows/Users/pietr/Desktop/PhD/Experiments/learning/test2/evidence.ev", "-v", "-v", "-v", "-v", "-v"]
+            // "args" : ["lfi", "-n", "100", "--logger",  "/media/windows/Users/pietr/Desktop/PhD/Experiments/learning/test6/test6.log", "/media/windows/Users/pietr/Desktop/PhD/Experiments/learning/test6/test_param.pl","/media/windows/Users/pietr/Desktop/PhD/Experiments/learning/test6/evidence.ev", "-v", "-v", "-v", "-v", "-v"]
             // "args" : ["--nologspace","/media/windows/Users/pietr/Desktop/PhD/Experiments/learning/test2/test.pl"]
             // "args" : ["lfi", "-n", "100",  "/media/windows/Users/pietr/Desktop/PhD/Problogs/ASP-Problog/test/learning/2.pl","/media/windows/Users/pietr/Desktop/PhD/Experiments/learning/evidence.ev", "-v", "-v", "-v", "-v", "-v"]
             // "args" : ["lfi", "/media/windows/Users/pietr/Desktop/PhD/Problogs/arg_problog/test/lfi/test.pl","/media/windows/Users/pietr/Desktop/PhD/Problogs/arg_problog/test/lfi/test.ev",  "-v", "-v", "-v", "-v", "-v"]
@@ -25,7 +25,7 @@
             // "args" : ["ground","/media/windows/Users/pietr/Desktop/PhD/Problogs/ASP-Problog/test/grounding/lfi.pl"]
             // "args" : ["lfi","/media/windows/Users/pietr/Desktop/PhD/Problogs/arg_problog/test/lfi/Simple/test_13.pl","/media/windows/Users/pietr/Desktop/PhD/Problogs/arg_problog/test/lfi/Simple/test_13.ev", "-v", "-v", "-v", "-v", "-v"]
             // "args" : ["--nologspace","/media/windows/Users/pietr/Desktop/PhD/Problogs/ASP-Problog/test/simple_neg_cycle/neg_head/neg_heads.pl"]
-            // "args" : ["--nologspace","/media/windows/Users/pietr/Desktop/PhD/Problogs/ASP-Problog/test/smokers_easy.pl"]
+            // "args" : ["--nologspace","/media/windows/Users/pietr/Desktop/PhD/Problogs/ASP-Problog/test/smokers.pl"]
             // "args" : ["/media/windows/Users/pietr/Desktop/PhD/Problogs/ASP-Problog/test/args.pl"]
             // "args" : ["--nologspace","/media/windows/Users/pietr/Desktop/PhD/Problogs/ASP-Problog/test/simple_neg_cycle/neg/neg.pl"]
             // "args" : ["ground","/media/windows/Users/pietr/Desktop/PhD/Problogs/ASP-Problog/test/bug/2.pl"]

@@ -35,7 +35,7 @@ from .formula import LogicDAG
 from .cnf_formula import CNF, CNF_ASP
 from .core import transform
 from .errors import CompilationError
-from .util import Timer, subprocess_check_call
+from .util import Timer, subprocess_check_output
 from .logic import Constant
 
 
@@ -55,19 +55,21 @@ class DDNNF(LogicDAG, EvaluatableDSP):
     transform_preference = 20
 
     # noinspection PyUnusedLocal,PyUnusedLocal,PyUnusedLocal
-    def __init__(self, **kwdargs):
+    def __init__(self, n_models=None, **kwdargs):
         LogicDAG.__init__(self, auto_compact=False)
+        self.n_models = n_models
 
     def _create_evaluator(self, semiring, weights, **kwargs):
-        return SimpleDDNNFEvaluator(self, semiring, weights)
+        return SimpleDDNNFEvaluator(self, semiring, weights, self.n_models)
 
 
 class SimpleDDNNFEvaluator(Evaluator):
     """Evaluator for d-DNNFs."""
 
-    def __init__(self, formula, semiring, weights=None, **kwargs):
+    def __init__(self, formula, semiring, weights=None, n_models=None, **kwargs):
         Evaluator.__init__(self, formula, semiring, weights, **kwargs)
         self.cache_intermediate = {}  # weights of intermediate nodes
+        self.n_models = n_models
         self.keytotal = {}
         self.keyworlds = {}
         self.multi_sm = Counter()
@@ -459,24 +461,25 @@ class SimpleDDNNFEvaluator(Evaluator):
         self.labelled = [id for _, id, _ in self.formula.labeled()] # logical and probabilistic atoms
         weights = self.formula.get_weights()
         self.choices = set([key for key in weights if not isinstance(weights[key], bool)])
-        root = len(self.formula._nodes)
-        # print(weights)
-        # print(self.labelled)
-        # print(self.choices)
+        if not self.n_models == 2**len(self.choices):
+            root = len(self.formula._nodes)
+            # print(weights)
+            # print(self.labelled)
+            # print(self.choices)
 
-        ws = self.get_worlds(root)  
-        n_models = len(ws)  
-        worlds = [w for ws in self.keyworlds.values() for w in ws]
-        self.multi_sm = Counter(worlds)
-        # if the number of models is a multiple of the total number from the counter
-        # then there must be some non-probabilistic choice in each world
-        # then normalize each world w.r.t. that number
-        n_pws = sum(self.multi_sm.values())
-        n_logic_choices = n_models / n_pws
+            ws = self.get_worlds(root)  
+            n_models = len(ws)  
+            worlds = [w for ws in self.keyworlds.values() for w in ws]
+            self.multi_sm = Counter(worlds)
+            # if the number of models is a multiple of the total number from the counter
+            # then there must be some non-probabilistic choice in each world
+            # then normalize each world w.r.t. that number
+            n_pws = sum(self.multi_sm.values())
+            n_logic_choices = n_models / n_pws
 
-        self.multi_sm = {k: c*n_logic_choices for k, c in self.multi_sm.items() if c>1 or n_logic_choices>1}
-        # print(self.keyworlds)
-        # print(self.multi_sm)
+            self.multi_sm = {k: c*n_logic_choices for k, c in self.multi_sm.items() if c>1 or n_logic_choices>1}
+            # print(self.keyworlds)
+            # print(self.multi_sm)
 
 class Compiler(object):
     """Interface to CNF to d-DNNF compiler tool."""
@@ -639,19 +642,22 @@ def _compile(cnf, cmd, cnf_file, nnf_file):
         success = False
         while attempts_left and not success:
             try:
-                # subprocess_check_call(cmd)
-                with open(os.devnull, "w") as OUT_NULL:
-                    subprocess_check_call(cmd, stdout=OUT_NULL)
+                out=subprocess_check_output(cmd)
+                # with open(os.devnull, "w") as OUT_NULL:
+                #     subprocess_check_call(cmd, stdout=OUT_NULL)
+                i = out.find("# of solutions:")
+                j = out.find("#SAT")
+                n_models = float(out[i+17:j])
                 success = True
             except subprocess.CalledProcessError as err:
                 attempts_left -= 1
                 if attempts_left == 0:
                     raise err
-        return _load_nnf(nnf_file, cnf)
+        return _load_nnf(nnf_file, cnf, n_models)
 
 
-def _load_nnf(filename, cnf):
-    nnf = DDNNF()
+def _load_nnf(filename, cnf, n_models = 0):
+    nnf = DDNNF(n_models)
 
     weights = cnf.get_weights()
 
