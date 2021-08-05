@@ -60,7 +60,7 @@ class DDNNF(LogicDAG, EvaluatableDSP):
         self.n_models = n_models
 
     def _create_evaluator(self, semiring, weights, **kwargs):
-        return SimpleDDNNFEvaluator(self, SemiringProbability(), weights, self.n_models)
+        return SimpleDDNNFEvaluator(self, semiring, weights, self.n_models)
 
 
 class SimpleDDNNFEvaluator(Evaluator):
@@ -69,6 +69,7 @@ class SimpleDDNNFEvaluator(Evaluator):
     def __init__(self, formula, semiring, weights=None, n_models=None, **kwargs):
         Evaluator.__init__(self, formula, semiring, weights, **kwargs)
         self.cache_intermediate = {}  # weights of intermediate nodes
+        self.cache_models = {} # weights of models
         self.n_models = n_models
         self.keytotal = {}
         self.keyworlds = {}
@@ -96,6 +97,7 @@ class SimpleDDNNFEvaluator(Evaluator):
 
     def _get_z(self):
         result = self.get_root_weight()
+        result = self.correct_weight(result)
         return result
 
     def evaluate_evidence(self, recompute=False):
@@ -154,26 +156,42 @@ class SimpleDDNNFEvaluator(Evaluator):
             self._set_value(abs(node), (node > 0))
             result = self.get_root_weight()
             self._reset_value(abs(node), p, n)
+            w = self.semiring.result(result, self.formula)
+            result = self.correct_weight(w, node)
             if self.has_evidence() or self.semiring.is_nsp():
                 result = self.semiring.normalize(result, self._get_z())
-            w = self.semiring.result(result, self.formula)
-            for pw in self.multi_sm:
-                models = self.multi_sm[pw]
-                for model in models:
-                    if node in model: 
-                        n = len(models)
-                        w_pw = self.semiring.one()
-                        for atom in pw:
-                            w_at = self._get_weight(atom)
-                            w_pw = self.semiring.times(w_pw, w_at)
-                        extra_norm = self.semiring.value(1-1/n)
-                        extra_weight = self.semiring.times(w_pw, extra_norm)
-                        # w-extra = 1-(extra+(1-w))
-                        a = self.semiring.negate(w)
-                        b = self.semiring.plus(extra_weight,a)
-                        w = self.semiring.negate(b)
-        return w
+        return result
 
+    def correct_weight(self, w, node=None):
+        """
+        compute the unnormalized weight first, then for each 1:many model to which the node belongs
+        remove the weight of the other models that the unnormalized weight
+        """
+        for pw in self.multi_sm:
+            if pw in self.cache_models:
+                w_pw = self.cache_models[pw]
+            else:
+                w_pw = self.semiring.one()
+                for atom in pw:
+                    w_at = self._get_weight(atom)
+                    w_pw = self.semiring.times(w_pw, w_at)
+                models = self.multi_sm[pw]
+                n = len(models)
+                if not self.semiring.is_zero(w_pw):
+                    for model in models:
+                        # check if model is still possible given evidence
+                        ok_ev = True
+                        if self.has_evidence():
+                            for e in self.evidence():
+                                ok_ev = ok_ev and e in model
+                        if ok_ev and (node in model or node is None): 
+                            extra_norm = self.semiring.value(1-1/n)
+                            extra_weight = self.semiring.times(w_pw, extra_norm)
+                            # w-extra = 1-(extra+(1-w))
+                            a = self.semiring.negate(w)
+                            b = self.semiring.plus(extra_weight,a)
+                            w = self.semiring.negate(b)
+        return w
     # Aggregate and correct later
     def _reset_value(self, index, pos, neg):
         self.set_weight(index, pos, neg)
@@ -244,6 +262,7 @@ class SimpleDDNNFEvaluator(Evaluator):
         # index = index of atom in weights, so atom2var[key] = index
         self.weights[index] = (pos, neg)
         self.cache_intermediate.clear()
+        self.cache_models.clear()
 
     def set_evidence(self, index, value):
         curr_pos_weight, curr_neg_weight = self.weights.get(index)
@@ -478,7 +497,7 @@ class SimpleDDNNFEvaluator(Evaluator):
         self.labelled = [id for _, id, _ in self.formula.labeled()] # logical and probabilistic atoms
         weights = self.formula.get_weights()
         self.choices = set([key for key in weights if not isinstance(weights[key], bool)])
-        if not self.n_models == 2**len(self.choices):
+        if not self.n_models <= 2**len(self.choices):
             root = len(self.formula._nodes)
             # print(weights)
             # print(self.labelled)
