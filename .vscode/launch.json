@@ -11,8 +11,8 @@
             "request": "launch",
             "program": "problog-cli.py",
             "console": "integratedTerminal",
-            "args" : ["--nologspace","/media/windows/Users/pietr/Desktop/PhD/Problogs/ASP-Problog/test/evidence/many.pl"]
-            // "args" : ["lfi", "-n", "100", "--logger",  "/media/windows/Users/pietr/Desktop/PhD/Experiments/learning/test4/test.log", "/media/windows/Users/pietr/Desktop/PhD/Experiments/learning/test4/test_param.pl","/media/windows/Users/pietr/Desktop/PhD/Experiments/learning/test4/evidence.ev", "-v", "-v", "-v", "-v", "-v"]
+            // "args" : ["--nologspace","/media/windows/Users/pietr/Desktop/PhD/Problogs/ASP-Problog/test/evidence/compact.pl"]
+            "args" : ["lfi", "-n", "100", "--logger",  "/media/windows/Users/pietr/Desktop/PhD/Experiments/learning/test4/test.log", "/media/windows/Users/pietr/Desktop/PhD/Experiments/learning/test4/test_param.pl","/media/windows/Users/pietr/Desktop/PhD/Experiments/learning/test4/evidence.ev", "-v", "-v", "-v", "-v", "-v"]
             // "args" : ["/media/windows/Users/pietr/Desktop/PhD/Experiments/learning/test6/test.pl"]
             // "args" : ["lfi", "-n", "100",  "/media/windows/Users/pietr/Desktop/PhD/Problogs/ASP-Problog/test/learning/2.pl","/media/windows/Users/pietr/Desktop/PhD/Experiments/learning/evidence.ev", "-v", "-v", "-v", "-v", "-v"]
             // "args" : ["lfi", "/media/windows/Users/pietr/Desktop/PhD/Problogs/arg_problog/test/lfi/test.pl","/media/windows/Users/pietr/Desktop/PhD/Problogs/arg_problog/test/lfi/test.ev",  "-v", "-v", "-v", "-v", "-v"]
