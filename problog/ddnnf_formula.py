@@ -27,6 +27,7 @@ from problog.ground_gringo import check_evidence
 import tempfile
 import os
 import subprocess
+import time
 from collections import defaultdict, Counter
 
 from . import system_info
@@ -36,7 +37,7 @@ from .formula import LogicDAG
 from .cnf_formula import CNF, CNF_ASP
 from .core import transform
 from .errors import CompilationError
-from .util import Timer, subprocess_check_output
+from .util import Timer, subprocess_check_output, subprocess_check_call
 from .logic import Constant
 
 
@@ -56,28 +57,28 @@ class DDNNF(LogicDAG, EvaluatableDSP):
     transform_preference = 20
 
     # noinspection PyUnusedLocal,PyUnusedLocal,PyUnusedLocal
-    def __init__(self, n_models=None, **kwdargs):
+    def __init__(self, neg_cycles=None, **kwdargs):
         LogicDAG.__init__(self, auto_compact=False)
-        self.n_models = n_models
+        # self.n_models = n_models
+        self.neg_cycles = neg_cycles
 
     def _create_evaluator(self, semiring, weights, **kwargs):
-        return SimpleDDNNFEvaluator(self, semiring, weights, self.n_models)
+        return SimpleDDNNFEvaluator(self, semiring, weights, self.neg_cycles)
 
 
 class SimpleDDNNFEvaluator(Evaluator):
     """Evaluator for d-DNNFs."""
 
-    def __init__(self, formula, semiring, weights=None, n_models=None, **kwargs):
+    def __init__(self, formula, semiring, weights=None, neg_cycles=None, **kwargs):
         Evaluator.__init__(self, formula, semiring, weights, **kwargs)
         self.cache_intermediate = {}  # weights of intermediate nodes
         self.cache_models = {} # weights of models
-        self.n_models = n_models
+        self.neg_cycles = neg_cycles
         self.keytotal = {}
         self.keyworlds = {}
         self.models = []
         self.multi_sm = {}
         # print(formula.to_dot())
-        # print(formula)
         self.multi_stable_models()
 
     def _initialize(self, with_evidence=True):
@@ -98,9 +99,7 @@ class SimpleDDNNFEvaluator(Evaluator):
 
     def _get_z(self):
         result = self.get_root_weight()
-        # print("z un", result, self.weights)
         result = self.correct_weight(result)
-        # print("z", result)
         return result
 
     def evaluate_evidence(self, recompute=False):
@@ -180,7 +179,6 @@ class SimpleDDNNFEvaluator(Evaluator):
         compute the unnormalized weight first, then for each 1:many model to which the node belongs
         remove the weight of the other models that the unnormalized weight
         """
-        # print(node, w)
         for pw in self.multi_sm:
             if pw in self.cache_models:
                 w_pw = self.cache_models[pw]
@@ -190,10 +188,9 @@ class SimpleDDNNFEvaluator(Evaluator):
                     w_at = self._get_weight(atom)
                     w_pw = self.semiring.times(w_pw, w_at)
                 n = len(self.multi_sm[pw])
+                # consider only models that are possible w.r.t. evidence (but n is w.r.t. all anyway) 
                 models = [m for m in self.multi_sm[pw] if self.check_model_evidence(m)]
-                # n = len(models)
                 if not self.semiring.is_zero(w_pw):
-                    # print(pw, w_pw)
                     for model in models:
                         if node in model or node is None: 
                             # print(">", node, model)
@@ -203,9 +200,6 @@ class SimpleDDNNFEvaluator(Evaluator):
                             a = self.semiring.negate(w)
                             b = self.semiring.plus(extra_weight,a)
                             w = self.semiring.negate(b)
-                            # print(">", w_pw, extra_weight)
-        # print(node, w)
-        # print("----")
         return w
 
     # Aggregate and correct later
@@ -448,36 +442,70 @@ class SimpleDDNNFEvaluator(Evaluator):
     #             raise TypeError("Unexpected node type: '%s'." % ntype)
 
     # Aggregate later     
+    # def get_worlds(self, key):
+    #     if key == 0 or key is None:
+    #         return [[]]
+
+    #     node = self.formula.get_node(abs(key))
+    #     ntype = type(node).__name__
+
+    #     if ntype == 'atom':
+    #         # keep track of logical and probabilistic atoms
+    #         # if abs(key) in self.labelled or abs(key) in self.choices:
+    #         #     return [[key]]
+    #         # else: #ignore extra stuff from compiler
+    #         #     return [[]]
+    #         return [[key]]
+    #     else:
+    #         assert key > 0
+    #         childworlds = [self.get_worlds(c) for c in node.children]
+    #         # print("cws:", key, childworlds)
+    #         if ntype == 'conj':
+    #             cw_conj = list(self.product(childworlds))
+    #             # print("cj:", key,  cw_conj)
+    #             return cw_conj  # this contains partial worlds
+    #         elif ntype == 'disj':
+    #             disj = []
+    #             for cws in childworlds:
+    #                 disj += [w for w in cws] # just flatten or 
+    #             # print("dws:", disj)
+    #             return disj
+    #         else:
+    #             raise TypeError("Unexpected node type: '%s'." % ntype)
+
+    # Aggregate later with numpy
     def get_worlds(self, key):
         if key == 0 or key is None:
-            return [[]]
+            return ((),)
 
         node = self.formula.get_node(abs(key))
         ntype = type(node).__name__
 
         if ntype == 'atom':
-            # keep track of logical and probabilistic atoms
-            # if abs(key) in self.labelled or abs(key) in self.choices:
-            #     return [[key]]
-            # else: #ignore extra stuff from compiler
-            #     return [[]]
-            return [[key]]
+            return ((key, ), )
         else:
             assert key > 0
             childworlds = [self.get_worlds(c) for c in node.children]
             # print("cws:", key, childworlds)
             if ntype == 'conj':
-                cw_conj = list(self.product(childworlds))
-                # print("cj:", key,  cw_conj)
+                cw_conj = tuple(self.tproduct(childworlds))
+                # print("cj:", key,  len(cw_conj), [len(w) for w in cw_conj])
                 return cw_conj  # this contains partial worlds
             elif ntype == 'disj':
-                disj = []
-                for cws in childworlds:
-                    disj += [w for w in cws] # just flatten or 
+                # disj = childworlds.flatten()
+                disj = sum(childworlds, ())
                 # print("dws:", disj)
                 return disj
             else:
                 raise TypeError("Unexpected node type: '%s'." % ntype)
+
+    def tproduct(self, ar_list):
+        if not ar_list:
+            yield ()
+        else:
+            for a in ar_list[0]:
+                for prod in self.tproduct(ar_list[1:]):
+                    yield a+prod
 
     def product(self, ar_list):
         if not ar_list:
@@ -540,13 +568,17 @@ class SimpleDDNNFEvaluator(Evaluator):
         self.labelled = [id for _, id, _ in self.formula.labeled()] # logical and probabilistic atoms
         weights = self.formula.get_weights()
         self.choices = set([key for key in weights if not isinstance(weights[key], bool)])
-        if not self.n_models <= 2**len(self.choices):
+        # print(len(self.choices),len(self.formula))
+        if self.neg_cycles:
+            # print("mh")
             root = len(self.formula._nodes)
             # print(weights)
             # print(self.labelled)
             # print(self.choices)
 
-            self.models = self.get_worlds(root)  
+            start = time.time()
+            self.models = self.get_worlds(root)
+
             # n_models = len(self.models)  
             # worlds = [w for ws in self.keyworlds.values() for w in ws]
             # self.multi_sm = Counter(worlds)
@@ -567,7 +599,9 @@ class SimpleDDNNFEvaluator(Evaluator):
             self.multi_sm = {k:self.multi_sm[k] for k in self.multi_sm if len(self.multi_sm[k])>1}
             # self.multi_sm = {k: c*n_logic_choices for k, c in self.multi_sm.items() if c>1 or n_logic_choices>1}
             # print(self.keyworlds)
-            # print(self.multi_sm)
+            end = time.time()
+            print(f"Enumeration: {round(end-start,3)}s")
+            # print(len(self.multi_sm))
 
 class Compiler(object):
     """Interface to CNF to d-DNNF compiler tool."""
@@ -730,22 +764,25 @@ def _compile(cnf, cmd, cnf_file, nnf_file):
         success = False
         while attempts_left and not success:
             try:
-                out=subprocess_check_output(cmd)
-                # with open(os.devnull, "w") as OUT_NULL:
-                #     subprocess_check_call(cmd, stdout=OUT_NULL)
-                i = out.find("# of solutions:")
-                j = out.find("#SAT")
-                n_models = float(out[i+17:j])
+                start = time.time()
+                # out = subprocess_check_output(cmd)
+                with open(os.devnull, "w") as OUT_NULL:
+                    subprocess_check_call(cmd, stdout=OUT_NULL)
+                end = time.time()
+                print(f"Compilation: {round(end-start,3)}s")
+                # i = out.find("# of solutions:")
+                # j = out.find("#SAT")
+                # n_models = float(out[i+17:j])
                 success = True
             except subprocess.CalledProcessError as err:
                 attempts_left -= 1
                 if attempts_left == 0:
                     raise err
-        return _load_nnf(nnf_file, cnf, n_models)
+        return _load_nnf(nnf_file, cnf)
 
 
-def _load_nnf(filename, cnf, n_models = 0):
-    nnf = DDNNF(n_models)
+def _load_nnf(filename, cnf):
+    nnf = DDNNF(cnf.neg_cycles)
 
     weights = cnf.get_weights()
 

@@ -22,6 +22,7 @@ import stat
 import sys
 import os
 import traceback
+import time
 
 from ..program import PrologFile, SimpleProgram
 from ..engine import DefaultEngine
@@ -144,7 +145,11 @@ def execute(
             if knowledge is None or type(knowledge) == str:
                 knowledge = get_evaluatable(knowledge, semiring=semiring)
             formula = knowledge.create_from(db, engine=engine, database=db, **kwdargs)
+
+            start = time.time()
             result = formula.evaluate(semiring=semiring, **kwdargs)
+            end = time.time()
+            print(f"Total: {round(end-start,3)}s")
 
             # Update location information on result terms
             for n, p in result.items():

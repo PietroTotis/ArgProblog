@@ -1551,7 +1551,8 @@ def print_result(d, outf, precision=8):
         # print(f
         #     "Number of iterations before convergence: {iterations}", file=outf
         # )
-        print(score, weights, names, iterations, file=outf)
+        # print(score, weights, names, iterations, file=outf)
+        print(lfi.get_model())
         return 0
     else:
         print(process_error(d), file=outf)

@@ -1834,6 +1834,8 @@ class LogicGraph(LogicFormula):
                         if self.is_anon_conj(c):
                             self.body_ids.append(c)
 
+        self.check_neg_cycles()
+
         for v in self.founded_vars:
             if (not (v in self.node_idx)):
                 self.strong_connect(v)
@@ -1891,6 +1893,35 @@ class LogicGraph(LogicFormula):
         succs = [c for c in lits if c in self.founded_vars or c in self.body_ids]
         return succs
 
+    def check_neg_cycles(self):
+        self.neg_cycles = False
+        for v in self.founded_vars:
+            neg = self.follow(v, False, [])
+            self.neg_cycles = self.neg_cycles or neg
+    
+    def follow(self, n, negation, visited):
+        neg = (n<=0)
+        negation = negation or neg
+        visited.append(n)
+        if neg:
+            node = self.get_node(-n)
+        else:
+            node = self.get_node(n)
+        if isinstance(node,atom):
+            return negation
+        elif isinstance(node, disj):
+            lits = node.children
+        else:
+            lits = self._unroll_conj(node)
+        visited_succs = [c for c in lits if c in visited]
+        new_succs = [c for c in lits if c not in visited]
+        if len(visited_succs) > 0 and negation:
+            return True
+        else:
+            for s in new_succs:
+                neg = self.follow(s, negation, visited)
+                negation = negation or neg
+            return negation
 
 
 class LogicNNF(LogicDAG, Evaluatable):

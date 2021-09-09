@@ -305,6 +305,10 @@ class SmodelsParser:
         if the atom already exists (head) add disjunct otherwise add it.
         """
         name = a.with_probability()
+        if "aux_new_" in a.functor:
+            # p = 0
+            # p = True
+            return logic_graph.FALSE
         if a in self.heads:
             id = logic_graph.get_node_by_name(name)
             label = Term(term2str(name)+"_fact")
@@ -312,16 +316,11 @@ class SmodelsParser:
             logic_graph.add_disjunct(id, atom_id)
             return atom_id
         else:
-            if "aux_new_" in a.functor:
-                # p = 0
-                # p = True
-                return logic_graph.FALSE
+            if a.probability is None:
+                id = 0
             else:
-                if a.probability is None:
-                    id = 0
-                else:
-                    p = a.probability if not a.functor.startswith("body_") else True # a bit hacky
-                    id = logic_graph.add_atom(name, p, name=name)
+                p = a.probability if not a.functor.startswith("body_") else True # a bit hacky
+                id = logic_graph.add_atom(name, p, name=name)
             return id
 
     def add_body(self, logic_graph, body):
@@ -722,9 +721,9 @@ class SmodelsParser:
         for ad in self.annotated_disjunctions_with_prob:
             gp.add_statement(ad)
         for head in self.base_rules:
-            if not self.names[head].startswith("aux"):
-                for r in self.base_rules[head]: 
-                    gp.add_clause(r)
+            # if not self.names[head].startswith("aux"):
+            for r in self.base_rules[head]: 
+                gp.add_clause(r)
         for q in self.queries:
             gp.add_statement(self.queries[q])
         return gp
