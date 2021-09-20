@@ -58,7 +58,7 @@ class DDNNF(LogicDAG, EvaluatableDSP):
 
     # noinspection PyUnusedLocal,PyUnusedLocal,PyUnusedLocal
     def __init__(self, neg_cycles=None, **kwdargs):
-        LogicDAG.__init__(self, auto_compact=False)
+        LogicDAG.__init__(self, auto_compact=False, **kwdargs)
         # self.n_models = n_models
         self.neg_cycles = neg_cycles
 
@@ -78,6 +78,7 @@ class SimpleDDNNFEvaluator(Evaluator):
         self.keyworlds = {}
         self.models = []
         self.multi_sm = {}
+        self.valid_choices = set()
         # print(formula.to_dot())
         self.multi_stable_models()
 
@@ -164,7 +165,6 @@ class SimpleDDNNFEvaluator(Evaluator):
             if self.has_evidence() or self.semiring.is_nsp():
                 result = self.semiring.normalize(result, self._get_z())
             result = self.semiring.result(result, self.formula)
-            # print(node, result)
         return result
         
     def check_model_evidence(self, model):
@@ -177,7 +177,7 @@ class SimpleDDNNFEvaluator(Evaluator):
     def correct_weight(self, w, node=None):
         """
         compute the unnormalized weight first, then for each 1:many model to which the node belongs
-        remove the weight of the other models that the unnormalized weight
+        remove the weight of the other models that the unnormalized weight includes
         """
         for pw in self.multi_sm:
             if pw in self.cache_models:
@@ -201,6 +201,47 @@ class SimpleDDNNFEvaluator(Evaluator):
                             b = self.semiring.plus(extra_weight,a)
                             w = self.semiring.negate(b)
         return w
+    
+    def query(self, index):
+        self._initialize()
+        weights = self.weights.copy()
+        valid_mass = self.semiring.zero()
+        choice = self.valid_choices.pop()
+        self.valid_choices.add(choice)
+        for atom in choice:
+            weights[abs(atom)] = (self.semiring.zero(), self.semiring.zero())
+        valid_choices_weights = {}
+        for vc in self.valid_choices:
+            w  = self.semiring.one()
+            for atom in vc:
+                aw = self.weights[abs(atom)][atom<0]
+                w = self.semiring.times(w,aw)
+            valid_choices_weights[vc] = w
+            valid_mass = self.semiring.plus(valid_mass,w)
+            for atom in vc:
+                val = atom<0
+                if val:
+                    neg = weights[abs(atom)][val]
+                    weights[abs(atom)] = (weights[abs(atom)][val], self.semiring.plus(neg, w))
+                else:
+                    pos = weights[abs(atom)][val]
+                    weights[abs(atom)] = (self.semiring.plus(pos, w), weights[abs(atom)][val])
+
+        p = self.semiring.zero()
+        for vc in self.valid_choices:
+            self.weights = weights
+            for atom in vc:
+                if atom>0:
+                    self.set_weight(abs(atom), self.semiring.one(), self.semiring.zero())
+                else:
+                    self.set_weight(abs(atom), self.semiring.zero(),  self.semiring.one())
+            e = self.evaluate(index)
+            pvc = self.semiring.times(valid_choices_weights[vc], e)
+            p = self.semiring.plus(p, pvc)
+        i = self.semiring.negate(valid_mass)
+        tot = self.semiring.plus(p, i)
+        n   = self.semiring.negate(tot)
+        return (p, n, i)
 
     # Aggregate and correct later
     def _reset_value(self, index, pos, neg):
@@ -389,6 +430,7 @@ class SimpleDDNNFEvaluator(Evaluator):
         else:
             assert key > 0
             childprobs = [self._get_weight(c) for c in node.children]
+            # print(key, list(zip(node.children, childprobs)))
             if ntype == "conj":
                 p = self.semiring.one()
                 for c in childprobs:
@@ -584,6 +626,7 @@ class SimpleDDNNFEvaluator(Evaluator):
             # self.multi_sm = Counter(worlds)
             for model in self.models:
                 choices = frozenset([atom for atom in model if abs(atom) in self.choices])
+                self.valid_choices.add(choices)
                 if choices in self.multi_sm:
                     self.multi_sm[choices].append(model)
                 else:
@@ -765,9 +808,10 @@ def _compile(cnf, cmd, cnf_file, nnf_file):
         while attempts_left and not success:
             try:
                 start = time.time()
-                # out = subprocess_check_output(cmd)
-                with open(os.devnull, "w") as OUT_NULL:
-                    subprocess_check_call(cmd, stdout=OUT_NULL)
+                out = subprocess_check_output(cmd)
+                print(out)
+                # with open(os.devnull, "w") as OUT_NULL:
+                #     subprocess_check_call(cmd, stdout=OUT_NULL)
                 end = time.time()
                 print(f"Compilation: {round(end-start,3)}s")
                 # i = out.find("# of solutions:")
@@ -782,7 +826,7 @@ def _compile(cnf, cmd, cnf_file, nnf_file):
 
 
 def _load_nnf(filename, cnf):
-    nnf = DDNNF(cnf.neg_cycles)
+    nnf = DDNNF(cnf.neg_cycles, keep_all=True)
 
     weights = cnf.get_weights()
 
@@ -795,7 +839,6 @@ def _load_nnf(filename, cnf):
         rename = {}
         lnum = 0
         for line in f:
-            # print(line)
             line = line.strip().split()
             if line[0] == "nnf":
                 pass
@@ -828,6 +871,7 @@ def _load_nnf(filename, cnf):
                     nnf.add_name(actual_name, 0, label)
                 else:
                     nnf.add_name(actual_name, None, label)
+
     for c in cnf.constraints():
         nnf.add_constraint(c.copy(rename))
 

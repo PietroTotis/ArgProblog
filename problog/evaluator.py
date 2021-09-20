@@ -581,7 +581,7 @@ class Evaluatable(ProbLogObject):
 
             # interrupted = False
             for name, node, label in evaluator.formula.labeled():
-                w = evaluator.evaluate(node)
+                w = evaluator.query(node)
                 result[name] = w
             return result
         else:

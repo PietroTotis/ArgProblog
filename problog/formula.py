@@ -518,7 +518,6 @@ class LogicFormula(BaseFormula):
             lname = -name if key < 0 else name
             node = node._replace(name=lname)
             self._update(abs(key), node)
-
         BaseFormula.add_name(self, name, key, label)
 
     # ====================================================================================== #
