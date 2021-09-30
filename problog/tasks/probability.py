@@ -50,6 +50,7 @@ def print_result(d, output, debug=False, precision=8):
     """
     success, d = d
     if success:
+        print("\tt\t\tf\t\ti", file=output)
         print(format_dictionary(d, precision), file=output)
         return 0
     else:

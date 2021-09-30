@@ -203,45 +203,56 @@ class SimpleDDNNFEvaluator(Evaluator):
         return w
     
     def query(self, index):
-        self._initialize()
-        weights = self.weights.copy()
-        valid_mass = self.semiring.zero()
-        choice = self.valid_choices.pop()
-        self.valid_choices.add(choice)
-        for atom in choice:
-            weights[abs(atom)] = (self.semiring.zero(), self.semiring.zero())
-        valid_choices_weights = {}
-        for vc in self.valid_choices:
-            w  = self.semiring.one()
-            for atom in vc:
-                aw = self.weights[abs(atom)][atom<0]
-                w = self.semiring.times(w,aw)
-            valid_choices_weights[vc] = w
-            valid_mass = self.semiring.plus(valid_mass,w)
-            for atom in vc:
-                val = atom<0
-                if val:
-                    neg = weights[abs(atom)][val]
-                    weights[abs(atom)] = (weights[abs(atom)][val], self.semiring.plus(neg, w))
-                else:
-                    pos = weights[abs(atom)][val]
-                    weights[abs(atom)] = (self.semiring.plus(pos, w), weights[abs(atom)][val])
+        if len(list(self.evidence()))==0:
+            root_weight = self._get_z()
+            inconsistent_weight = self.semiring.negate(root_weight)
+            true_weight = self.evaluate(index)
+            false_weight = self.semiring.negate(self.semiring.plus(inconsistent_weight,true_weight))
+            return (true_weight, false_weight, inconsistent_weight)
+        else:
+            true_weight = self.evaluate(index)
+            false_weight = self.semiring.negate(true_weight)
+            return (true_weight, false_weight, self.semiring.zero())
 
-        p = self.semiring.zero()
-        for vc in self.valid_choices:
-            self.weights = weights
-            for atom in vc:
-                if atom>0:
-                    self.set_weight(abs(atom), self.semiring.one(), self.semiring.zero())
-                else:
-                    self.set_weight(abs(atom), self.semiring.zero(),  self.semiring.one())
-            e = self.evaluate(index)
-            pvc = self.semiring.times(valid_choices_weights[vc], e)
-            p = self.semiring.plus(p, pvc)
-        i = self.semiring.negate(valid_mass)
-        tot = self.semiring.plus(p, i)
-        n   = self.semiring.negate(tot)
-        return (p, n, i)
+        # self._initialize()
+        # weights = self.weights.copy()
+        # valid_mass = self.semiring.zero()
+        # choice = self.valid_choices.pop()
+        # self.valid_choices.add(choice)
+        # for atom in choice:
+        #     weights[abs(atom)] = (self.semiring.zero(), self.semiring.zero())
+        # valid_choices_weights = {}
+        # for vc in self.valid_choices:
+        #     w  = self.semiring.one()
+        #     for atom in vc:
+        #         aw = self.weights[abs(atom)][atom<0]
+        #         w = self.semiring.times(w,aw)
+        #     valid_choices_weights[vc] = w
+        #     valid_mass = self.semiring.plus(valid_mass,w)
+        #     for atom in vc:
+        #         val = atom<0
+        #         if val:
+        #             neg = weights[abs(atom)][val]
+        #             weights[abs(atom)] = (weights[abs(atom)][val], self.semiring.plus(neg, w))
+        #         else:
+        #             pos = weights[abs(atom)][val]
+        #             weights[abs(atom)] = (self.semiring.plus(pos, w), weights[abs(atom)][val])
+
+        # p = self.semiring.zero()
+        # for vc in self.valid_choices:
+        #     self.weights = weights
+        #     for atom in vc:
+        #         if atom>0:
+        #             self.set_weight(abs(atom), self.semiring.one(), self.semiring.zero())
+        #         else:
+        #             self.set_weight(abs(atom), self.semiring.zero(),  self.semiring.one())
+        #     e = self.evaluate(index)
+        #     pvc = self.semiring.times(valid_choices_weights[vc], e)
+        #     p = self.semiring.plus(p, pvc)
+        # i = self.semiring.negate(valid_mass)
+        # tot = self.semiring.plus(p, i)
+        # n   = self.semiring.negate(tot)
+        # return (p, n, i)
 
     # Aggregate and correct later
     def _reset_value(self, index, pos, neg):
@@ -809,7 +820,7 @@ def _compile(cnf, cmd, cnf_file, nnf_file):
             try:
                 start = time.time()
                 out = subprocess_check_output(cmd)
-                print(out)
+                # print(out)
                 # with open(os.devnull, "w") as OUT_NULL:
                 #     subprocess_check_call(cmd, stdout=OUT_NULL)
                 end = time.time()
@@ -868,7 +879,7 @@ def _load_nnf(filename, cnf):
         for name in names_inv:
             for actual_name, label in names_inv[name]:
                 if name == 0:
-                    nnf.add_name(actual_name, 0, label)
+                    nnf.add_name(actual_name, len(nnf), label)
                 else:
                     nnf.add_name(actual_name, None, label)
 

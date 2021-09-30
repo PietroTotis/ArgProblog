@@ -11,6 +11,7 @@
             "request": "launch",
             "program": "problog-cli.py",
             "console": "integratedTerminal",
+            // "args" : ["--nologspace", "/media/windows/Users/pietr/Desktop/PhD/Problogs/ASP-Problog/test/args_prop.pl"]
             "args" : ["--nologspace", "/media/windows/Users/pietr/Desktop/PhD/Problogs/ASP-Problog/test/incoherent.pl"]
             // "args" : ["--nologspace", "/media/windows/Users/pietr/Desktop/PhD/Experiments/smproblog/Learning/robot/robot.pl"]
             // "args" : ["lfi", "-n", "200", "/media/windows/Users/pietr/Desktop/PhD/Experiments/smproblog/Argument graphs2/learn/micro_c166.pl", "/media/windows/Users/pietr/Desktop/PhD/Experiments/smproblog/Argument graphs2/samples/100/micro_c166.ev" , "-v", "-v", "-v", "-v", "-v"]
