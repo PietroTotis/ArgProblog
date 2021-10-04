@@ -399,12 +399,14 @@ class CNF_ASP(CNF):
 
     def __init__(self, **kwdargs):
         CNF.__init__(self, **kwdargs)
+        self.neg_cycles = False
 
 # noinspection PyUnusedLocal
 @transform(LogicGraph, CNF_ASP)
 def cnf_dsharp_asp(source, destination, force_atoms=False, **kwdargs):
     
     source.compute_sccs()
+    destination.neg_cycles = source.neg_cycles
     max_id = 0
     
     # Add scc info
