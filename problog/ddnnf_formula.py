@@ -819,10 +819,10 @@ def _compile(cnf, cmd, cnf_file, nnf_file):
         while attempts_left and not success:
             try:
                 start = time.time()
-                out = subprocess_check_output(cmd)
+                # out = subprocess_check_output(cmd)
                 # print(out)
-                # with open(os.devnull, "w") as OUT_NULL:
-                #     subprocess_check_call(cmd, stdout=OUT_NULL)
+                with open(os.devnull, "w") as OUT_NULL:
+                    subprocess_check_call(cmd, stdout=OUT_NULL)
                 end = time.time()
                 print(f"Compilation: {round(end-start,3)}s")
                 # i = out.find("# of solutions:")
