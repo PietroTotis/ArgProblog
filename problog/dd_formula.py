@@ -572,6 +572,9 @@ class DDEvaluator(Evaluator):
         )
         result = self.semiring.result(literal_result, self.formula)
         return result
+    
+    def query(self, node):
+        return self.evaluate(node)
 
     def set_evidence(self, index, value):
         curr_pos_weight, curr_neg_weight = self.weights.get(index)

@@ -113,6 +113,7 @@ class ProbLog(object):
 
         # Find transformation paths from source to target.
         for path in cls.find_paths(src, target):
+            print(path)
             try:
                 # A path is a sequence of obj, function, obj/class, ..., obj/class
                 current_obj = src
