@@ -5,7 +5,7 @@ import os
 
 from .util import subprocess_check_output, mktempfile, Timer
 from logging import getLogger, log
-from .logic import AnnotatedDisjunction, term2str, Term, Clause, Or, Constant, And, Not
+from .logic import AnnotatedDisjunction, term2str, Term, Clause, Or, Constant, And, Not, Var
 from collections import defaultdict, deque
 from subprocess import CalledProcessError
 from .errors import GroundingError
@@ -51,8 +51,8 @@ def ground_gringo(model, target=None, queries=[], evidence=[], propagate_evidenc
 
         converted = [statement_to_gringo(l, stmt) for l, stmt in enumerate(model)]
 
-        # for s in converted:
-        #     print(s)
+        for s in converted:
+            print(s)
 
         with open(fn_model, 'w') as f:
             f.write('\n'.join(converted) + '\n')
@@ -189,32 +189,39 @@ def special_clause_to_gringo(cl, args):
     return stmt_str
 
 def special_fact_to_gringo(sf, args):
-    vars = sf.variables()
-    safe_fact = Clause(sf,*args)
-    tmp = f"{safe_fact}."
-    stmt_str = ""
-    new_vars = []
-    if "_" in vars: #replace _ in head with name
-        i = tmp.find("(")
-        while tmp[i] != ":":
-            if tmp[i] == "_":
-                v = "Gringo_anon_" + str(i)
-                new_vars.append(v)
-                stmt_str += v
-            else:
-                stmt_str += tmp[i]
-            i += 1
-        i = tmp[i:].find("(")
-        while tmp[i] != ".":
-            if tmp[i] == "_":
-                v = new_vars.pop()
-                stmt_str += v
-            else:
-                stmt_str += tmp[i]
-            i += 1
-        stmt_str += "."
-    else:
-        stmt_str = tmp
+    # vars = sf.variables()
+    # tmp = f"{safe_fact}."
+    v = Var("Gringo_anon")
+    sub = {Var("_"):v}
+    safe_fact = Clause(sf.apply(sub),*[a.apply(sub) for a in args])
+    return f"{safe_fact}."
+    # stmt_str = ""
+    # new_vars = []
+    # if "_" in vars: #replace _ in head with name
+    #     i = tmp.find("(")
+    #     while tmp[i] != ":":
+    #         if tmp[i] == "_":
+    #             v = "Gringo_anon_" + str(i)
+    #             new_vars.append(v)
+    #             stmt_str += v
+    #         else:
+    #             stmt_str += tmp[i]
+    #         i += 1
+    #     stmt_str += " :- "
+    #     # head = tmp[:i]
+    #     body = tmp[i:]
+    #     i = body.find("(")
+    #     while body[i] != ".":
+    #         if body[i] == "_":
+    #             v = new_vars.pop()
+    #             stmt_str += v
+    #         else:
+    #             stmt_str += body[i]
+    #         i += 1
+    #     stmt_str += "."
+    # else:
+    #     stmt_str = tmp
+    
     return stmt_str
  
 def statement_to_gringo(line, statement):

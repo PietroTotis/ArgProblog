@@ -257,6 +257,12 @@ def argparser():
         "--output", "-o", help="Output file (default stdout)", type=OutputFile
     )
     parser.add_argument(
+        "--pasp",
+        action="store_true",
+        help="Use probabilistic ASP semantics (default: False).",
+        default=False,
+    )
+    parser.add_argument(
         "--recursion-limit",
         help="Set Python recursion limit. (default: %d)" % sys.getrecursionlimit(),
         default=sys.getrecursionlimit(),

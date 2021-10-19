@@ -63,7 +63,7 @@ class DDNNF(LogicDAG, EvaluatableDSP):
         self.neg_cycles = neg_cycles
 
     def _create_evaluator(self, semiring, weights, **kwargs):
-        return SimpleDDNNFEvaluator(self, semiring, weights, self.neg_cycles)
+        return SimpleDDNNFEvaluator(self, semiring, weights, self.neg_cycles, **kwargs)
 
 
 class SimpleDDNNFEvaluator(Evaluator):
@@ -79,8 +79,11 @@ class SimpleDDNNFEvaluator(Evaluator):
         self.models = []
         self.multi_sm = {}
         self.valid_choices = set()
+        self.pasp = kwargs["pasp"]
         # print(formula.to_dot())
-        self.multi_stable_models()
+
+        if not self.pasp:
+            self.multi_stable_models()
 
     def _initialize(self, with_evidence=True):
         self.weights.clear()
@@ -162,7 +165,7 @@ class SimpleDDNNFEvaluator(Evaluator):
             # if not abs(node) in self.evidence():
             # if not self.has_evidence():
             result = self.correct_weight(result, node)
-            if self.has_evidence() or self.semiring.is_nsp():
+            if self.has_evidence() or self.semiring.is_nsp() or self.pasp:
                 result = self.semiring.normalize(result, self._get_z())
             result = self.semiring.result(result, self.formula)
         return result
@@ -203,6 +206,8 @@ class SimpleDDNNFEvaluator(Evaluator):
         return w
     
     def query(self, index):
+        if self.pasp:
+            return self.evaluate(index)
         if len(list(self.evidence()))==0:
             root_weight = self._get_z()
             inconsistent_weight = self.semiring.negate(root_weight)
