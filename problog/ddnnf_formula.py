@@ -660,7 +660,7 @@ class SimpleDDNNFEvaluator(Evaluator):
             # print(self.keyworlds)
             end = time.time()
             print(f"Enumeration: {round(end-start,3)}s")
-            # print(len(self.multi_sm))
+            # print(self.multi_sm.values())
 
 class Compiler(object):
     """Interface to CNF to d-DNNF compiler tool."""

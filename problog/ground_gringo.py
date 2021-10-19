@@ -51,8 +51,8 @@ def ground_gringo(model, target=None, queries=[], evidence=[], propagate_evidenc
 
         converted = [statement_to_gringo(l, stmt) for l, stmt in enumerate(model)]
 
-        for s in converted:
-            print(s)
+        # for s in converted:
+        #     print(s)
 
         with open(fn_model, 'w') as f:
             f.write('\n'.join(converted) + '\n')
