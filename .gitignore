@@ -13,6 +13,7 @@ trash/
 
 /problog/bin/darwin/cnf2dDNNF
 /problog/bin/darwin/maxsatz
+/problog/bin/linux/c2d
 /problog/bin/java/
 
 sandbox/

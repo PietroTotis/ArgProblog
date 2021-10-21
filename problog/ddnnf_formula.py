@@ -697,68 +697,69 @@ class Compiler(object):
         cls.__compilers[name] = func
 
 
-if system_info.get("c2d", False):
+# if system_info.get("c2d", False):
+
     # noinspection PyUnusedLocal
-    @transform(CNF, DDNNF)
-    def _compile_with_c2d(cnf, nnf=None, smooth=True, **kwdargs):
-        fd, cnf_file = tempfile.mkstemp(".cnf")
-        os.close(fd)
-        nnf_file = cnf_file + ".nnf"
-        if smooth:
-            smoothl = ["-smooth_all"]
-        else:
-            smoothl = []
+@transform(CNF_ASP, DDNNF)
+def _compile_with_c2d(cnf, nnf=None, smooth=True, **kwdargs):
+    fd, cnf_file = tempfile.mkstemp(".cnf")
+    os.close(fd)
+    nnf_file = cnf_file + ".nnf"
+    if smooth:
+        smoothl = ["-smooth_all"]
+    else:
+        smoothl = []
 
-        cmd = ["cnf2dDNNF", "-dt_method", "0"] + smoothl + ["-reduce", "-in", cnf_file]
+    cmd = ["c2d"] + smoothl + ["-reduce", "-in", cnf_file]
 
-        try:
-            os.remove(cnf_file)
-        except OSError:
-            pass
-        try:
-            os.remove(nnf_file)
-        except OSError:
-            pass
+    try:
+        os.remove(cnf_file)
+    except OSError:
+        pass
+    try:
+        os.remove(nnf_file)
+    except OSError:
+        pass
 
-        return _compile(cnf, cmd, cnf_file, nnf_file)
+    return _compile(cnf, cmd, cnf_file, nnf_file)
 
-    Compiler.add("c2d", _compile_with_c2d)
+Compiler.add("c2d", _compile_with_c2d)
 
 
 # noinspection PyUnusedLocal
-@transform(CNF, DDNNF)
-@transform(CNF_ASP, DDNNF)
-def _compile_with_dsharp(cnf, nnf=None, smooth=True, **kwdargs):
-    result = None
-    with Timer("DSharp compilation"):
-        fd1, cnf_file = tempfile.mkstemp(".cnf")
-        fd2, nnf_file = tempfile.mkstemp(".nnf")
-        os.close(fd1)
-        os.close(fd2)
-        if smooth:
-            smoothl = ["-smoothNNF"]
-        else:
-            smoothl = []
-        cmd = ["dsharp", "-Fnnf", nnf_file] + smoothl + ["-disableAllLits", cnf_file]  #
+# @transform(CNF, DDNNF)
+# @transform(CNF_ASP, DDNNF)
+# def _compile_with_dsharp(cnf, nnf=None, smooth=True, **kwdargs):
+#     result = None
+#     with Timer("DSharp compilation"):
+#         fd1, cnf_file = tempfile.mkstemp(".cnf")
+#         fd2, nnf_file = tempfile.mkstemp(".nnf")
+#         os.close(fd1)
+#         os.close(fd2)
+#         if smooth:
+#             smoothl = ["-smoothNNF"]
+#         else:
+#             smoothl = []
+#         cmd = ["dsharp", "-Fnnf", nnf_file] + smoothl + ["-disableAllLits", cnf_file]  #
 
-        try:
-            result = _compile(cnf, cmd, cnf_file, nnf_file)
-        except subprocess.CalledProcessError:
-            raise DSharpError()
+#         try:
+#             result = _compile(cnf, cmd, cnf_file, nnf_file)
+#         except subprocess.CalledProcessError:
+#             raise DSharpError()
 
-        try:
-            os.remove(cnf_file)
-        except OSError:
-            pass
-        try:
-            os.remove(nnf_file)
-        except OSError:
-            pass
+#         try:
+#             os.remove(cnf_file)
+#         except OSError:
+#             pass
+#         try:
+#             os.remove(nnf_file)
+#         except OSError:
+#             pass
 
-    return result
+#     return result
 
 
-Compiler.add("dsharp", _compile_with_dsharp)
+# Compiler.add("dsharp", _compile_with_dsharp)
 
 # noinspection PyUnusedLocal
 # @transform(CNF_ASP, DDNNF)
