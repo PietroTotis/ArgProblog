@@ -30,6 +30,7 @@ from collections import defaultdict
 from .program import LogicProgram
 from .logic import *
 from .formula import LogicFormula, LogicGraph
+from .cnf_formula import CNF_ASP
 from .engine_unify import *
 
 from .core import transform
@@ -40,7 +41,7 @@ from subprocess import CalledProcessError
 
 
 # @transform(LogicProgram, LogicFormula)
-@transform(LogicProgram, LogicGraph)
+@transform(LogicProgram, CNF_ASP)
 def ground(model, target=None, grounder=None, **kwdargs):
     """Ground a given model.
 
@@ -50,7 +51,7 @@ def ground(model, target=None, grounder=None, **kwdargs):
     :rtype: LogicFormula
     """
     from .ground_gringo import ground_gringo
-    return ground_gringo(model, target, **kwdargs)
+    return ground_gringo(model, LogicGraph(), **kwdargs)
 
 # @transform(LogicProgram, LogicFormula)
 def ground(model, target=None, grounder=None, **kwdargs):

@@ -80,7 +80,7 @@ class SimpleDDNNFEvaluator(Evaluator):
         self.multi_sm = {}
         self.valid_choices = set()
         self.pasp = kwargs["pasp"]
-        # print(formula.to_dot())
+        print(formula.to_dot())
 
         if not self.pasp:
             self.multi_stable_models()
@@ -726,7 +726,8 @@ if system_info.get("c2d", False):
 
 
 # noinspection PyUnusedLocal
-# @transform(CNF, DDNNF)
+@transform(CNF, DDNNF)
+@transform(CNF_ASP, DDNNF)
 def _compile_with_dsharp(cnf, nnf=None, smooth=True, **kwdargs):
     result = None
     with Timer("DSharp compilation"):
@@ -760,39 +761,39 @@ def _compile_with_dsharp(cnf, nnf=None, smooth=True, **kwdargs):
 Compiler.add("dsharp", _compile_with_dsharp)
 
 # noinspection PyUnusedLocal
-@transform(CNF_ASP, DDNNF)
-def _compile_with_dsharp_asp(cnf, nnf=None, smooth=True, **kwdargs):
-    result = None
-    with Timer('DSharp compilation'):
-        fd1, cnf_file = tempfile.mkstemp('.cnf')
-        fd2, nnf_file = tempfile.mkstemp('.nnf')
-        os.close(fd1)
-        os.close(fd2)
-        if smooth:
-            smoothl = '-smoothNNF'
-        else:
-            smoothl = ''
-        # cmd = ['dsharp_with_unfounded', '-noIBCP', '-evidencePropagated', '-noPP', '-Fnnf', nnf_file, smoothl, '-disableAllLits', cnf_file]
-        # cmd = ['dsharp_with_unfounded', '-noIBCP', '-noPP', '-Fnnf', nnf_file, smoothl, '-disableAllLits', cnf_file]
-        cmd = ['dsharp_with_unfounded', '-noIBCP', '-noPP', '-Fnnf', nnf_file, '-smoothNNF', '-disableAllLits', cnf_file]
+# @transform(CNF_ASP, DDNNF)
+# def _compile_with_dsharp_asp(cnf, nnf=None, smooth=True, **kwdargs):
+#     result = None
+#     with Timer('DSharp compilation'):
+#         fd1, cnf_file = tempfile.mkstemp('.cnf')
+#         fd2, nnf_file = tempfile.mkstemp('.nnf')
+#         os.close(fd1)
+#         os.close(fd2)
+#         if smooth:
+#             smoothl = '-smoothNNF'
+#         else:
+#             smoothl = ''
+#         # cmd = ['dsharp_with_unfounded', '-noIBCP', '-evidencePropagated', '-noPP', '-Fnnf', nnf_file, smoothl, '-disableAllLits', cnf_file]
+#         # cmd = ['dsharp_with_unfounded', '-noIBCP', '-noPP', '-Fnnf', nnf_file, smoothl, '-disableAllLits', cnf_file]
+#         cmd = ['dsharp_with_unfounded', '-noIBCP', '-noPP', '-Fnnf', nnf_file, '-smoothNNF', '-disableAllLits', cnf_file]
 
-        try:
-            result = _compile(cnf, cmd, cnf_file, nnf_file)
-        except subprocess.CalledProcessError:
-            raise DSharpError()
+#         try:
+#             result = _compile(cnf, cmd, cnf_file, nnf_file)
+#         except subprocess.CalledProcessError:
+#             raise DSharpError()
 
-        try:
-            os.remove(cnf_file)
-        except OSError:
-            pass
-        try:
-            os.remove(nnf_file)
-        except OSError:
-            pass
+#         try:
+#             os.remove(cnf_file)
+#         except OSError:
+#             pass
+#         try:
+#             os.remove(nnf_file)
+#         except OSError:
+#             pass
 
-    return result
+#     return result
 
-Compiler.add('dsharp_asp', _compile_with_dsharp_asp)
+# Compiler.add('dsharp_asp', _compile_with_dsharp_asp)
 
 
 def _compile(cnf, cmd, cnf_file, nnf_file):

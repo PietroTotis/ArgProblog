@@ -10,10 +10,12 @@ from collections import defaultdict, deque
 from subprocess import CalledProcessError
 from .errors import GroundingError
 from .engine import UnknownClause
-from .program import SimpleProgram, PrologString
-from .formula import LogicGraph
+from .program import SimpleProgram, PrologString, PrologFile
+from .formula import LogicGraph, LogicDAG
+from .cnf_formula import CNF_ASP
 from .constraint import ConstraintAD
 from .clausedb import ClauseDB
+from .aspmc.bin import main as break_cycles
 import platform
 
 # add exception for unsupported elements of the language (lists, imports...)
@@ -86,10 +88,39 @@ def ground_gringo(model, target=None, queries=[], evidence=[], propagate_evidenc
                     if node != 0 and node is not None
                 ]
                 lf.propagate(ev_nodes, lf.lookup_evidence)
+        # Cycle breaking
+        cnf_file = break_cycles.main(["", "-m", "problog",  lf.to_prolog()])
+        queries = [q for q,key in lf.queries()]
+        cnf = load_cnf(cnf_file, queries, **kwdargs)
         # print("Form")
         # print(lf)
         # print("---")
-        return lf
+        return cnf
+
+def load_cnf(filename, queries, **kwdargs):
+    cnf = CNF_ASP(**kwdargs)
+    with open(filename) as f:
+        for line in f:
+            line = line.strip().split()
+            if line[0] == "p":
+                atomcount = int(line[2])
+                cnf.set_atomcount(atomcount)
+                pass
+            elif line[0] == "c" and line[1] == "l":
+                atom = int(line[2])
+                label = Term(line[3])
+                if label in queries:
+                    cnf.add_name(label,atom,cnf.LABEL_QUERY)
+                else:
+                    cnf.add_name(label,atom,cnf.LABEL_NAMED)
+            elif line[0] == "c":
+                atom = int(line[1])
+                weight = float(line[2])
+                cnf.add_weight(atom, weight)
+            else:
+                cnf.add_cnf_clause([int(l) for l in line if l!="0"])
+    return cnf
+
 
 def annotated_disjunction_to_gringo(ad, line):
     heads = ad.heads
@@ -324,7 +355,8 @@ class SmodelsParser:
             return atom_id
         else:
             if a.probability is None:
-                id = 0
+                id = logic_graph.TRUE
+                logic_graph.add_name(name, id)
             else:
                 p = a.probability if not a.functor.startswith("body_") else True # a bit hacky
                 id = logic_graph.add_atom(name, p, name=name)

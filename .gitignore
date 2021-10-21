@@ -21,6 +21,7 @@ test-reports/
 
 problog/lib/python2/
 problog/lib/python3/
+problog/aspmc
 
 .DS_Store
 
