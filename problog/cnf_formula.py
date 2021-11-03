@@ -413,6 +413,7 @@ def cnf_dsharp_asp(source, destination, force_atoms=False, **kwdargs):
     scc_keys = set(source.scc.values())
     scc_stmt = f"s {len(scc_keys)}"
     destination.add_comment(scc_stmt)
+    # print([f"{source.get_name(k)}: {source.scc[k]}" for k in source.scc])
 
     # Add founded vars
     for f_var in source.founded_vars:
