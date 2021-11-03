@@ -74,7 +74,7 @@ def ground_gringo(model, target=None, queries=[], evidence=[], propagate_evidenc
         # print("----")
         # print(output)
         gop = SmodelsParser(output, target=target, queries=queries, evidence=evidence)
-        lf = gop.smodels2problog()
+        # lf = gop.smodels2problog()
         # print("ProbL")
         # for s in lf:
         #     print(s)

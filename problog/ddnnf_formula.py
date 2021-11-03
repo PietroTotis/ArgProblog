@@ -626,7 +626,7 @@ class SimpleDDNNFEvaluator(Evaluator):
         self.labelled = [id for _, id, _ in self.formula.labeled()] # logical and probabilistic atoms
         weights = self.formula.get_weights()
         self.choices = set([key for key in weights if not isinstance(weights[key], bool)])
-        # print(len(self.choices),len(self.formula))
+        print(len(self.choices),len(self.formula))
         if self.neg_cycles:
             # print("mh")
             root = len(self.formula._nodes)
