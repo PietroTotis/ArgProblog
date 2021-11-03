@@ -22,7 +22,7 @@ Provides access to d-DNNF formulae.
     limitations under the License.
 """
 from __future__ import print_function
-from problog.ground_gringo import check_evidence
+# from problog.ground_gringo import check_evidence
 
 import tempfile
 import os

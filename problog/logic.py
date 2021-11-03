@@ -611,6 +611,15 @@ class Term(object):
         """Checks whether the term represent a negated term."""
         return False
 
+    def is_query(self):
+        return self.__functor=="query"
+
+    def asp_string(self):
+        if self.probability is not None:
+            return f"{{{str(self.with_probability())}}}"
+        else:
+            return str(self)
+
     def variables(self, exclude_local=False):
         """Extract the variables present in the term.
 
@@ -933,6 +942,12 @@ class Clause(Term):
         self.reprhash = hash(self.repr)
         return self.repr
 
+    def is_query(self):
+        return self.head.is_query()
+
+    def asp_string(self):
+        return f"{self.head.asp_string()} :- {self.body.asp_string()}"
+
     @property
     def predicates(self):
         return [self.head.signature]
@@ -953,6 +968,12 @@ class AnnotatedDisjunction(Term):
             self.repr = "%s :- %s" % ("; ".join(map(str, self.heads)), self.body)
         self.reprhash = hash(self.repr)
         return self.repr
+
+    def asp_string(self):
+        heads = ";".join([h.asp_string() for h in self.heads])
+        head = "1 {"+ heads + "} 1"
+        body = self.body.asp_string()
+        return f"{head} :- {body}"
 
     @property
     def predicates(self):
@@ -1074,6 +1095,9 @@ class And(Term):
         self.reprhash = hash(self.repr)
         return self.repr
 
+    def asp_string():
+        return f"{self.lhs.asp_string()}, {self.rhs.asp_string()}"
+
     def with_args(self, *args):
         return self.__class__(*args, location=self.location)
 
@@ -1095,6 +1119,9 @@ class Not(Term):
             self.repr = "%s%s" % (self.functor, c)
         self.reprhash = hash(self.repr)
         return self.repr
+    
+    def asp_string(self):
+        return f"not {self.child.asp_string()}"
 
     def is_negated(self):
         return True

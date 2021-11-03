@@ -15,7 +15,7 @@ from .formula import LogicGraph, LogicDAG
 from .cnf_formula import CNF_ASP
 from .constraint import ConstraintAD
 from .clausedb import ClauseDB
-from .aspmc.bin import main as break_cycles
+from .aspmc.bin.main import break_cycles
 import platform
 
 # add exception for unsupported elements of the language (lists, imports...)
@@ -73,24 +73,28 @@ def ground_gringo(model, target=None, queries=[], evidence=[], propagate_evidenc
         
         # print("----")
         # print(output)
-        gop = SmodelsParser(output, target=target, queries=queries, evidence=evidence)
-        # lf = gop.smodels2problog()
+        smodels = SmodelsParser(output, target=target, queries=queries, evidence=evidence)
+        ground_program = smodels.smodels2problog()
         # print("ProbL")
-        # for s in lf:
+        # for s in gop.smodels2problog():
         #     print(s)
-        lf = gop.smodels2internal(**kwdargs)
-        if propagate_evidence:
-            with Timer("Propagating evidence"):
-                lf.lookup_evidence = {}
-                ev_nodes = [
-                    node
-                    for name, node in lf.evidence()
-                    if node != 0 and node is not None
-                ]
-                lf.propagate(ev_nodes, lf.lookup_evidence)
+        # lf = gop.smodels2internal(**kwdargs)
+        # if propagate_evidence:
+        #     with Timer("Propagating evidence"):
+        #         lf.lookup_evidence = {}
+        #         ev_nodes = [
+        #             node
+        #             for name, node in lf.evidence()
+        #             if node != 0 and node is not None
+        #         ]
+        #         lf.propagate(ev_nodes, lf.lookup_evidence)
         # Cycle breaking
-        cnf_file = break_cycles.main(["", "-m", "problog",  lf.to_prolog()])
-        queries = [q for q,key in lf.queries()]
+        # for s in lf:
+        #     print(s.asp_string())
+        cnf_file = break_cycles(ground_program)
+        # cnf_file = break_cycles(PrologString(lf.to_prolog()))
+        dirty_queries = [q.args for q in ground_program if q.is_query()]
+        queries = [p for q in dirty_queries for p in q]
         cnf = load_cnf(cnf_file, queries, **kwdargs)
         # print("Form")
         # print(lf)

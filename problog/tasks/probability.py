@@ -25,6 +25,7 @@ import traceback
 import time
 
 from ..program import PrologFile, SimpleProgram
+from ..logic import Term, Clause
 from ..engine import DefaultEngine
 from ..evaluator import SemiringLogProbability, SemiringProbability, SemiringSymbolic
 from .. import get_evaluatable, get_evaluatables, library_paths
