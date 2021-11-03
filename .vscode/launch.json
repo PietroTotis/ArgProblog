@@ -11,7 +11,9 @@
             "request": "launch",
             "program": "problog-cli.py",
             "console": "integratedTerminal",
-            "args" : ["--nologspace", "-k", "ddnnf", "--pasp", "/media/windows/Users/pietr/Desktop/PhD/Experiments/smproblog/smokers/smokers_neg/1/1.pl"]
+            // "args" : ["lfi", "-n", "100",  "/media/windows/Users/pietr/Desktop/PhD/Problogs/ASP-Problog/test/learning/inconsistent.pl","/media/windows/Users/pietr/Desktop/PhD/Problogs/ASP-Problog/test/learning/inconsistent.ev", "-v", "-v", "-v", "-v", "-v"]
+            // "args" : ["--nologspace", "-k", "ddnnf", "--pasp",  "/media/windows/Users/pietr/Desktop/PhD/Problogs/ASP-Problog/test/cbbug/bug.pl"]
+            // "args" : ["--nologspace", "-k", "ddnnf",  "/media/windows/Users/pietr/Desktop/PhD/Experiments/smproblog/smokers/smokers_neg/var/1.pl"]
             // "args" : ["--nologspace", "/media/windows/Users/pietr/Desktop/PhD/Problogs/ASP-Problog/test/args_prop.pl"]
             // "args" : ["--nologspace", "-k", "ddnnf", "/media/windows/Users/pietr/Desktop/PhD/Problogs/ASP-Problog/test/incoherent.pl"]
             // "args" : ["--nologspace", "/media/windows/Users/pietr/Desktop/PhD/Experiments/smproblog/Learning/robot/robot.pl"]
