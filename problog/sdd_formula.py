@@ -24,7 +24,9 @@ Interface to Sentential Decision Diagrams (SDD)
 from __future__ import print_function
 from collections import namedtuple
 
-from .formula import LogicDAG, LogicFormula, LogicNNF
+import pysdd
+
+from .formula import LogicDAG, LogicFormula, LogicGraph, LogicNNF
 from .core import transform
 from .errors import InstallError, InconsistentEvidenceError
 from .dd_formula import DD, build_dd, DDManager, DDEvaluator
@@ -217,6 +219,17 @@ class SDD(DD):
             cache[current_node.id] = retval
         return retval
 
+    # def from_cnf(self, cnf_file):
+    #     # prob_facts = [k for k, n, t in self if self.is_probabilistic(k)]
+    #     # xc = x_constrained(prob_facts)
+    #     # self.var_constraint = xc
+    #     self.init_varcount = self._atomcount
+    #     self.inode_manager = SDDManager(
+    #         auto_gc=self.auto_gc,
+    #         var_constraint=self.var_constraint,
+    #         varcount=self.init_varcount,
+    #         cnf_file = cnf_file
+    #     )
 
 class SDDManager(DDManager):
     """
@@ -224,7 +237,7 @@ class SDDManager(DDManager):
     It wraps around the SDD library and offers some additional methods.
     """
 
-    def __init__(self, varcount=0, auto_gc=False, var_constraint=None):
+    def __init__(self, varcount=0, auto_gc=False, var_constraint=None, cnf_file=None):
         """Create a new SDD manager.
 
         :param varcount: number of initial variables
@@ -248,6 +261,11 @@ class SDDManager(DDManager):
             var_count=varcount, auto_gc_and_minimize=auto_gc, vtree=vtree
         )
         self._assigned_varcount = 0
+        # if cnf_file is not None:
+        #     self.__manager, _ = sdd.SddManager().from_cnf_file(cnf_file.encode())
+        # print(self.__manager.model_count(self.__manager.root))
+        # tmp = mktempfile(".dot")
+        # self.__manager.save_as_dot(tmp.encode(), self.__manager.root)
 
     def _to_x_constrained_list(self, varcount, var_constraint):
         """
@@ -427,6 +445,7 @@ class SDDManager(DDManager):
         :return: weighted model count of node if literal=None, else the weights are propagated up to node but the
             weighted model count of literal is returned.
         """
+        # print(self.to_internal_dot())
         varcount = self.get_manager().var_count()
 
         if pr_semiring and wmc_func is None:  # library built_in (WmcManager)
@@ -597,6 +616,12 @@ class SDDManager(DDManager):
                             branch_weight = semiring.times(
                                 branch_weight, missing_combined_weight
                             )
+
+                    print(node, prime_vars, sub_vars)
+                    # if xc in prime+sub
+                    #   set weights.array[self.semiring/one()]*self.varcount
+                    #   norm = mc_node()
+                    #   result = result*norm
 
                     # Add to current intermediate result
                     if result_weight is not None:

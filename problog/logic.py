@@ -1095,8 +1095,8 @@ class And(Term):
         self.reprhash = hash(self.repr)
         return self.repr
 
-    def asp_string():
-        return f"{self.lhs.asp_string()}, {self.rhs.asp_string()}"
+    def asp_string(self):
+        return f"{self.op1.asp_string()}, {self.op2.asp_string()}"
 
     def with_args(self, *args):
         return self.__class__(*args, location=self.location)

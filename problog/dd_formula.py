@@ -93,6 +93,7 @@ class DD(LogicFormula, EvaluatableDSP):
             if result is None:
                 result = self._create_inode(node)
                 mgr.nodes[index - 1] = result
+            # print(">", index, result)
         return mgr.negate(result) if negate else result
 
     def _create_inode(
@@ -141,8 +142,9 @@ class DD(LogicFormula, EvaluatableDSP):
         )  # TODO self.evidence_all() ipv self.labeled() ? see forward.py
 
         for n in required_nodes:
-            self.get_inode(n)
+            print(n, self.get_inode(n))
 
+        # print(self.sdd_to_dot(self.get_manager().get_manager().root, show_id=True))
         self.build_constraint_dd()
 
     def build_constraint_dd(self):
@@ -176,7 +178,6 @@ class DD(LogicFormula, EvaluatableDSP):
             return "".join(dot_text)
         else:
             return self.to_formula().to_dot(*args, **kwargs)
-
 
 class DDManager(object):
     """
@@ -611,9 +612,11 @@ def build_dd(source, destination, **kwdargs):
     :param kwdargs: extra arguments
     :return: destination
     """
+    print(source)
     with Timer("Compiling %s" % destination.__class__.__name__):
 
-        # TODO maintain a translation table
+        translate = {}
+        mgr = destination.get_manager().get_manager()
         for i, n, t in source:
             if t == "atom":
                 j = destination.add_atom(
@@ -629,11 +632,25 @@ def build_dd(source, destination, **kwdargs):
                 j = destination.add_or(n.children, name=n.name)
             else:
                 raise TypeError("Unknown node type")
-            # assert i == j  # Does not hold with constraints. See if-comment.
+            translate[i] = j
 
         for name, node, label in source.get_names_with_label():
             destination.add_name(name, node, label)
+        
+        # Copy constraints
+        for c in source.constraints():
+            destination.add_constraint(c.copy(translate))
 
         destination.build_dd()
 
+    print(destination.var2atom)
+    lnm = {'true':'T', 'false':'F', 'mult': '∧', 'add' : '∨' }
+    for v in destination.var2atom:
+        lnm[v] = destination.get_name(destination.var2atom[v])
+        lnm[-v] = f"¬{destination.get_name(destination.var2atom[v])}"
+    print(lnm)
+    print(destination.sdd_to_dot(destination.get_inode(13), litnamemap=lnm, show_id=True))
+    print(destination.sdd_to_dot(destination.get_inode(12), litnamemap=lnm, show_id=True))
+    # print("root:", mgr.get_vars(15))
+    # print(">>>", mgr.model_count(mgr.root))
     return destination

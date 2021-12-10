@@ -2,6 +2,11 @@ from __future__ import print_function
 
 import sys
 import os
+import platform
+from problog.evaluator import SemiringProbability
+
+from .sdd_formula import SDDManager, SDD, build_sdd
+from .cycles import break_cycles
 
 from .util import subprocess_check_output, mktempfile, Timer
 from logging import getLogger, log
@@ -15,10 +20,65 @@ from .formula import LogicGraph, LogicDAG
 from .cnf_formula import CNF_ASP
 from .constraint import ConstraintAD
 from .clausedb import ClauseDB
-from .aspmc.bin.main import break_cycles
-import platform
+from .aspmc.main import aspmc
+from problog import program
+# from .aspmc2.bin.main import aspmc
+# from pysdd.sdd import SddManager
 
 # add exception for unsupported elements of the language (lists, imports...)
+
+def ground_to_graph(model, target=None, queries=[], evidence=[], propagate_evidence=False,
+               labels=None, engine=None, debug=False, **kwdargs):
+
+    ground = ground_gringo(model, target, queries, evidence, propagate_evidence,
+               labels, engine, debug, **kwdargs )
+
+    smodels = SmodelsParser(ground, target=target, queries=queries, evidence=evidence)
+    ground_program = smodels.smodels2internal()
+    
+    return ground_program
+
+def ground_to_cb_graph(model, target=None, queries=[], evidence=[], propagate_evidence=False,
+               labels=None, engine=None, debug=False, **kwdargs):
+    """
+    Ground and apply cycle breaking
+    """
+    
+    ground = ground_gringo(model, target, queries, evidence, propagate_evidence,
+               labels, engine, debug, **kwdargs )
+
+    smodels = SmodelsParser(ground, target=target, queries=queries, evidence=evidence)
+    ground_program = smodels.smodels2problog()
+    cnf_file, lp_file = aspmc(["", "--fast", "--mode", "smproblog"], ground_program.to_prolog())
+
+    queries_tuples = [q.args for q in ground_program if q.is_query()]
+    queries = [p for q in queries_tuples for p in q]
+    # cnf = load_cnf(cnf_file, queries, **kwdargs)
+    pf = PrologFile(lp_file)
+    broken2smodels = ground_gringo(pf, target, queries, evidence, propagate_evidence,
+               labels, engine, debug, **kwdargs ) 
+    smodels_broken = SmodelsParser(broken2smodels, target=target, queries=queries, evidence=evidence)
+    lg = smodels_broken.smodels2internal()
+    print(lg)
+    print("------")
+    # lg.cnf_file = cnf_file
+    return lg
+
+def ground_to_cnf(model, target=None, queries=[], evidence=[], propagate_evidence=False, 
+               labels=None, engine=None, debug=False, **kwdargs):
+            
+    ground = ground_gringo(model, target, queries, evidence, propagate_evidence,
+               labels, engine, debug, **kwdargs )
+
+    smodels = SmodelsParser(ground, target=target, queries=queries, evidence=evidence)
+    ground_program = smodels.smodels2problog()
+    cnf_file, lp_file = aspmc(ground_program)
+
+    queries_tuples = [q.args for q in ground_program if q.is_query()]
+    queries = [p for q in queries_tuples for p in q]
+    cnf = load_cnf(cnf_file, queries, **kwdargs)
+    return cnf
+
 
 def ground_gringo(model, target=None, queries=[], evidence=[], propagate_evidence=False,
                labels=None, engine=None, debug=False, **kwdargs):
@@ -38,15 +98,9 @@ def ground_gringo(model, target=None, queries=[], evidence=[], propagate_evidenc
 
         if debug:
             fn_model = '/tmp/model.pl'
-            # fn_ground = '/tmp/model.ground'
-            # fn_evidence = '/tmp/model.evidence'
-            # fn_query = '/tmp/model.query'
 
         else:
             fn_model = mktempfile('.pl')
-            # fn_ground = mktempfile('.ground')
-            # fn_evidence = mktempfile('.evidence')
-            # fn_query = mktempfile('.query')
 
         if isinstance(model, ClauseDB): # awful but need to go back from clausedb to a problog program
             model = PrologString(model.to_prolog())
@@ -71,38 +125,10 @@ def ground_gringo(model, target=None, queries=[], evidence=[], propagate_evidenc
             print(errmsg.decode('utf-8')) 
             raise err
         
-        # print("----")
-        # print(output)
-        smodels = SmodelsParser(output, target=target, queries=queries, evidence=evidence)
-        ground_program = smodels.smodels2problog()
-        # print("ProbL")
-        # for s in gop.smodels2problog():
-        #     print(s)
-        # lf = gop.smodels2internal(**kwdargs)
-        # if propagate_evidence:
-        #     with Timer("Propagating evidence"):
-        #         lf.lookup_evidence = {}
-        #         ev_nodes = [
-        #             node
-        #             for name, node in lf.evidence()
-        #             if node != 0 and node is not None
-        #         ]
-        #         lf.propagate(ev_nodes, lf.lookup_evidence)
-        # Cycle breaking
-        # for s in lf:
-        #     print(s.asp_string())
-        cnf_file = break_cycles(ground_program)
-        # cnf_file = break_cycles(PrologString(lf.to_prolog()))
-        dirty_queries = [q.args for q in ground_program if q.is_query()]
-        queries = [p for q in dirty_queries for p in q]
-        cnf = load_cnf(cnf_file, queries, **kwdargs)
-        # print("Form")
-        # print(lf)
-        # print("---")
-        return cnf
-
+        return output
+       
 def load_cnf(filename, queries, **kwdargs):
-    cnf = CNF_ASP(**kwdargs)
+    cnf = CNF_ASP(filename, **kwdargs)
     with open(filename) as f:
         for line in f:
             line = line.strip().split()
@@ -124,7 +150,6 @@ def load_cnf(filename, queries, **kwdargs):
             else:
                 cnf.add_cnf_clause([int(l) for l in line if l!="0"])
     return cnf
-
 
 def annotated_disjunction_to_gringo(ad, line):
     heads = ad.heads
@@ -720,7 +745,6 @@ class SmodelsParser:
                     lf.add_disjunct(or_id, body_id)
 
         # Evidence
-
         for e_id in self.evidence:
             e = self.evidence[e_id]
             e_term =  e.args[0]
@@ -755,19 +779,22 @@ class SmodelsParser:
         return lf
 
     def smodels2problog(self, **kwdargs):
-        gp = SimpleProgram(**kwdargs)
-        for f in self.facts:
-            for pf in self.facts[f]:
-                gp.add_fact(pf)
-        for e in self.evidence:
-            gp.add_statement(self.evidence[e])
-        for ad in self.annotated_disjunctions_with_prob:
-            gp.add_statement(ad)
-        for head in self.base_rules:
-            # if not self.names[head].startswith("aux"):
-            for r in self.base_rules[head]: 
-                gp.add_clause(r)
-        for q in self.queries:
-            gp.add_statement(self.queries[q])
-        return gp
+        program_string = self.smodels2internal().to_prolog()
+        return PrologString(program_string)
+        #fixme
+        # gp = SimpleProgram(**kwdargs)
+        # for f in self.facts:
+        #     for pf in self.facts[f]:
+        #         gp.add_fact(pf)
+        # for e in self.evidence:
+        #     gp.add_statement(self.evidence[e])
+        # for ad in self.annotated_disjunctions_with_prob:
+        #     gp.add_statement(ad)
+        # for head in self.base_rules:
+        #     # if not self.names[head].startswith("aux"):
+        #     for r in self.base_rules[head]: 
+        #         gp.add_clause(r)
+        # for q in self.queries:
+        #     gp.add_statement(self.queries[q])
+        # return gp
 

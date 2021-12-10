@@ -29,8 +29,9 @@ from collections import defaultdict
 
 from .program import LogicProgram
 from .logic import *
-from .formula import LogicFormula, LogicGraph
+from .formula import LogicFormula, LogicGraph, LogicDAG
 from .cnf_formula import CNF_ASP
+from .sdd_formula import SDD
 from .engine_unify import *
 
 from .core import transform
@@ -39,8 +40,30 @@ from .util import Timer
 
 from subprocess import CalledProcessError
 
+# @transform(LogicProgram, LogicGraph)
+# def ground(model, target=None, grounder=None, **kwdargs):
+#     """Ground a given model.
 
-# @transform(LogicProgram, LogicFormula)
+#     :param model: logic program to ground
+#     :type model: LogicProgram
+#     :return: the ground program
+#     :rtype: LogicFormula
+#     """
+#     from .ground_gringo import ground_to_graph
+#     return ground_to_dag(model, LogicGraph(), **kwdargs)
+
+@transform(LogicProgram, LogicGraph)
+def ground(model, target=None, grounder=None, **kwdargs):
+    """Ground a given model.
+
+    :param model: logic program to ground
+    :type model: LogicProgram
+    :return: the ground program
+    :rtype: LogicGraph
+    """
+    from .ground_gringo import ground_to_cb_graph
+    return ground_to_cb_graph(model, **kwdargs)
+
 @transform(LogicProgram, CNF_ASP)
 def ground(model, target=None, grounder=None, **kwdargs):
     """Ground a given model.
@@ -50,8 +73,8 @@ def ground(model, target=None, grounder=None, **kwdargs):
     :return: the ground program
     :rtype: LogicFormula
     """
-    from .ground_gringo import ground_gringo
-    return ground_gringo(model, LogicGraph(), **kwdargs)
+    from .ground_gringo import ground_to_cnf
+    return ground_to_cnf(model, **kwdargs)
 
 # @transform(LogicProgram, LogicFormula)
 def ground(model, target=None, grounder=None, **kwdargs):

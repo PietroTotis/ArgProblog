@@ -227,9 +227,11 @@ class BaseFormula(ProbLogObject):
                 return res
         raise KeyError(name)
 
-    # def get_name(self, key):
-    #     names = self.get_names()
-    #     print (names)
+    def get_name(self, key):
+        names = self.get_names()
+        print(names)
+        for n in names:
+            print(n)
 
     def add_query(self, name, key, keep_name=False):
         """Add a query name.
@@ -1735,10 +1737,18 @@ class LogicDAG(LogicFormula):
 
 class LogicGraph(LogicFormula):
 
-    def __init__(self, auto_compact=True, **kwdargs):
+    def __init__(self, cnf_file=None, auto_compact=True, **kwdargs):
         LogicFormula.__init__(self, auto_compact, **kwdargs)
         self.founded_vars = set()
         self.scc = {}
+        self.in_neg_cycles = None
+        self.cnf_file = cnf_file
+
+    def get_in_neg_cycles(self):
+        if self.in_neg_cycles is None:
+            self.compute_sccs()
+            self.check_neg_cycles()
+        return self.in_neg_cycles
 
     def get_founded_by_name(self, name):
         for index, node, nodetype in self:
@@ -1894,6 +1904,7 @@ class LogicGraph(LogicFormula):
 
     def check_neg_cycles(self):
         self.neg_cycles = False
+        self.in_neg_cycles = []
         for v in self.founded_vars:
             neg = self.follow(v, False, [])
             self.neg_cycles = self.neg_cycles or neg
@@ -1901,24 +1912,27 @@ class LogicGraph(LogicFormula):
     def follow(self, n, negation, visited):
         neg = (n<=0)
         negation = negation or neg
+        # print("\t", n, visited)
         visited.append(n)
         if neg:
             node = self.get_node(-n)
         else:
             node = self.get_node(n)
         if isinstance(node,atom):
-            return negation
+            return False
         elif isinstance(node, disj):
             lits = node.children
         else:
             lits = self._unroll_conj(node)
         visited_succs = [c for c in lits if c in visited]
+        # print("\t", n, visited_succs)
         new_succs = [c for c in lits if c not in visited]
         if len(visited_succs) > 0 and negation:
+            self.in_neg_cycles += [abs(n) for n in visited_succs]
             return True
         else:
             for s in new_succs:
-                neg = self.follow(s, negation, visited)
+                neg = self.follow(s, negation, visited.copy())
                 negation = negation or neg
             return negation
 
@@ -2016,3 +2030,56 @@ def dag_to_nnf(source, target=None, **kwargs):
         target.add_constraint(c.copy(translate))
 
     return target
+
+# @transform(LogicGraph, LogicDAG)
+# def graph_to_dag(source, destination=None, **kwargs):
+    # remove negative cycles (only after "positive" cycle breaking)
+    
+    # if destination is None:
+    #     destination = LogicDAG()
+
+    # in_neg_cycles = source.get_in_neg_cycles()
+    # print(in_neg_cycles)
+    # inc = 0
+    # neg_map = {}
+    # translation = {}
+
+    # def translate(index):
+    #     if index >0:
+    #         return translation[index]
+    #     else:
+    #         return -translation[-index]
+
+
+    # for i, n, t in source:
+    #     if t == "atom":
+    #         j = destination.add_atom(
+    #             n.identifier,
+    #             n.probability,
+    #             n.group,
+    #             name=source.get_name(i),
+    #             cr_extra=False,
+    #         )
+    #         translation[i] = j
+    # # translation map
+    # for atom in in_neg_cycles:
+    #     nbc_id = destination.add_atom(f"_nbc{atom}", None, name=Term(f"nbc{inc}"))
+    #     # not_nbc = destination.add_atom(f"_nbcn{atom}", None, name=Term(f"nbcn{inc}"))
+    #     neg_map[atom] = nbc_id
+
+    # print(translation)
+    # print(destination)
+    # for i, n, t in source:
+    #     if t != "atom":
+    #         children = [neg_map.get(c,translate(c)) for c in n.children]
+    #     print(i,n,children)
+    #     if t == "conj":
+    #         j = destination.add_and(children, name=n.name)
+    #     else:
+    #         j = destination.add_or(children, name=n.name)
+    #     translation[i] = j
+    
+    # constraints = [destination.add_and([id,-neg_map[id]]) for id in neg_map]
+    # destination.add_and([-c for c in constraints])    
+
+    # return destination
