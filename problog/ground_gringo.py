@@ -3,6 +3,7 @@ from __future__ import print_function
 import sys
 import os
 import platform
+sys.path.append(os.path.join(os.path.dirname(__file__), 'aspmc'))
 from problog.evaluator import SemiringProbability
 
 from .sdd_formula import SDDManager, SDD, build_sdd
@@ -20,12 +21,26 @@ from .formula import LogicGraph, LogicDAG
 from .cnf_formula import CNF_ASP
 from .constraint import ConstraintAD
 from .clausedb import ClauseDB
-from .aspmc.main import aspmc
+from .aspmc.aspmc.programs.smprogram import SMProblogProgram
+from .aspmc.aspmc.compile import constrained_compile as concom
+from .aspmc.aspmc.compile import vtree as vtree
+from .ddnnf_formula import _load_nnf
 from problog import program
-# from .aspmc2.bin.main import aspmc
-# from pysdd.sdd import SddManager
 
 # add exception for unsupported elements of the language (lists, imports...)
+
+def aspmc(program_str):
+
+    program = SMProblogProgram(program_str, [])
+    program.tpUnfold()
+    program.td_guided_both_clark_completion()
+    lp = program._prog_string(program._program)
+    cnf = program.get_cnf()
+    # results, file = cnf.compile()
+    # print(file)
+    # print(_load_nnf(file, CNF_ASP()).to_dot())
+    return cnf, lp
+
 
 def ground_to_graph(model, target=None, queries=[], evidence=[], propagate_evidence=False,
                labels=None, engine=None, debug=False, **kwdargs):
@@ -49,18 +64,21 @@ def ground_to_cb_graph(model, target=None, queries=[], evidence=[], propagate_ev
 
     smodels = SmodelsParser(ground, target=target, queries=queries, evidence=evidence)
     ground_program = smodels.smodels2problog()
-    cnf_file, lp_file = aspmc(["", "--fast", "--mode", "smproblog"], ground_program.to_prolog())
+    cnf, lp_string = aspmc(ground_program.to_prolog())
+    (_, v3) = concom.tree_from_cnf(cnf, tree_type=vtree.Vtree)
 
     queries_tuples = [q.args for q in ground_program if q.is_query()]
     queries = [p for q in queries_tuples for p in q]
     # cnf = load_cnf(cnf_file, queries, **kwdargs)
-    pf = PrologFile(lp_file)
+    pf = PrologString(lp_string)
     broken2smodels = ground_gringo(pf, target, queries, evidence, propagate_evidence,
                labels, engine, debug, **kwdargs ) 
     smodels_broken = SmodelsParser(broken2smodels, target=target, queries=queries, evidence=evidence)
     lg = smodels_broken.smodels2internal()
     print(lg)
     print("------")
+    lg.vtree = v3
+    # lg.defined = cnf.get_defined()
     # lg.cnf_file = cnf_file
     return lg
 
@@ -72,13 +90,12 @@ def ground_to_cnf(model, target=None, queries=[], evidence=[], propagate_evidenc
 
     smodels = SmodelsParser(ground, target=target, queries=queries, evidence=evidence)
     ground_program = smodels.smodels2problog()
-    cnf_file, lp_file = aspmc(ground_program)
+    cnf_string, lp_string = aspmc(ground_program)
 
     queries_tuples = [q.args for q in ground_program if q.is_query()]
     queries = [p for q in queries_tuples for p in q]
-    cnf = load_cnf(cnf_file, queries, **kwdargs)
+    cnf = load_cnf(cnf_string, queries, **kwdargs)
     return cnf
-
 
 def ground_gringo(model, target=None, queries=[], evidence=[], propagate_evidence=False,
                labels=None, engine=None, debug=False, **kwdargs):
@@ -127,27 +144,26 @@ def ground_gringo(model, target=None, queries=[], evidence=[], propagate_evidenc
         
         return output
        
-def load_cnf(filename, queries, **kwdargs):
-    cnf = CNF_ASP(filename, **kwdargs)
-    with open(filename) as f:
-        for line in f:
-            line = line.strip().split()
-            if line[0] == "p":
-                atomcount = int(line[2])
-                cnf.set_atomcount(atomcount)
-                pass
-            elif line[0] == "c" and line[1] == "l":
-                atom = int(line[2])
-                label = Term(line[3])
-                if label in queries:
-                    cnf.add_name(label,atom,cnf.LABEL_QUERY)
-                else:
-                    cnf.add_name(label,atom,cnf.LABEL_NAMED)
-            elif line[0] == "c":
-                atom = int(line[1])
-                weight = float(line[2])
-                cnf.add_weight(atom, weight)
+def load_cnf(cnf, queries, **kwdargs):
+    cnf = CNF_ASP(cnf, **kwdargs)
+    for line in cnf:
+        line = line.strip().split()
+        if line[0] == "p":
+            atomcount = int(line[2])
+            cnf.set_atomcount(atomcount)
+            pass
+        elif line[0] == "c" and line[1] == "l":
+            atom = int(line[2])
+            label = Term(line[3])
+            if label in queries:
+                cnf.add_name(label,atom,cnf.LABEL_QUERY)
             else:
+                cnf.add_name(label,atom,cnf.LABEL_NAMED)
+        elif line[0] == "c":
+            atom = int(line[1])
+            weight = float(line[2])
+            cnf.add_weight(atom, weight)
+        else:
                 cnf.add_cnf_clause([int(l) for l in line if l!="0"])
     return cnf
 

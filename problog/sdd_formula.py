@@ -22,7 +22,7 @@ Interface to Sentential Decision Diagrams (SDD)
     limitations under the License.
 """
 from __future__ import print_function
-from collections import namedtuple
+from collections import namedtuple, deque
 
 import pysdd
 
@@ -38,9 +38,10 @@ import os
 # noinspection PyBroadException
 try:
     from pysdd import sdd
-    from pysdd.iterator import SddIterator
+    # from pysdd.iterator import SddIterator
     from pysdd.util import sdd_to_dot
-    from pysdd.sdd import Vtree
+    from pysdd.sdd import Vtree, SddManager, SddNode
+    from pysdd.util import BitArray
 except Exception as err:
     sdd = None
 
@@ -109,6 +110,8 @@ class SDD(DD):
             auto_gc=self.auto_gc,
             var_constraint=self.var_constraint,
             varcount=self.init_varcount,
+            vtree=self.vtree,
+            litnamemap=self.lnm
         )
 
     def _create_evaluator(self, semiring, weights, **kwargs):
@@ -237,7 +240,7 @@ class SDDManager(DDManager):
     It wraps around the SDD library and offers some additional methods.
     """
 
-    def __init__(self, varcount=0, auto_gc=False, var_constraint=None, cnf_file=None):
+    def __init__(self, varcount=0, auto_gc=False, var_constraint=None, vtree=None, litnamemap=None):
         """Create a new SDD manager.
 
         :param varcount: number of initial variables
@@ -250,11 +253,18 @@ class SDDManager(DDManager):
         DDManager.__init__(self)
         if varcount is None or varcount <= 0:
             varcount = 1
-        vtree = None
+        self.litnamemap = litnamemap
+        # if vtree is not None:
+        #     v3_file = mktempfile()
+        #     with open(v3_file, "w") as f:
+        #         f.write(str(vtree))
+        #     vtree = Vtree.from_file(v3_file)
+        #     print(">>>>>>>",vtree.dot())
+        # else:
         if var_constraint is not None and varcount > 1:
-            x_constraint = self._to_x_constrained_list(varcount, var_constraint)
+            self.x_constraint = self._to_x_constrained_list(varcount, var_constraint)
             vtree = Vtree.new_with_X_constrained(
-                var_count=varcount, is_X_var=x_constraint, vtree_type="balanced"
+                var_count=varcount, is_X_var=self.x_constraint, vtree_type="balanced"
             )
 
         self.__manager = sdd.SddManager(
@@ -264,8 +274,6 @@ class SDDManager(DDManager):
         # if cnf_file is not None:
         #     self.__manager, _ = sdd.SddManager().from_cnf_file(cnf_file.encode())
         # print(self.__manager.model_count(self.__manager.root))
-        # tmp = mktempfile(".dot")
-        # self.__manager.save_as_dot(tmp.encode(), self.__manager.root)
 
     def _to_x_constrained_list(self, varcount, var_constraint):
         """
@@ -419,6 +427,8 @@ class SDDManager(DDManager):
         perform_smoothing=True,
         smooth_to_root=False,
         wmc_func=None,
+        normalize = True,
+        debug=True
     ):
         """Perform Weighted Model Count on the given node or the given literal.
 
@@ -447,70 +457,78 @@ class SDDManager(DDManager):
         """
         # print(self.to_internal_dot())
         varcount = self.get_manager().var_count()
-
-        if pr_semiring and wmc_func is None:  # library built_in (WmcManager)
-            logspace = 0
-            if semiring.one() == 0.0:
-                logspace = 1
-
-            # setup
-            wmc_manager = sdd.WmcManager(node, log_mode=logspace)
-            for (
-                n
-            ) in weights:  # TODO wmc_manager.set_literal_weights_from_array is faster
-                pos, neg = weights[n]
-                if n <= varcount:
-                    wmc_manager.set_literal_weight(n, pos)
-                    wmc_manager.set_literal_weight(-n, neg)
-            # Cover edge case e.g. node=SddNode(True)
-            if varcount == 1 and weights.get(1) is None:
-                wmc_manager.set_literal_weight(1, semiring.one())
-                wmc_manager.set_literal_weight(-1, semiring.zero())
-
-            # Calculate result
-            result = wmc_manager.propagate()
-            if literal is not None:
-                result = wmc_manager.literal_pr(literal)
-            if weights.get(0) is not None:  # Times the weight of True
-                result = result * weights[0][0]
-        else:  # manual iteration (SddIterator)
-            if wmc_func is None:
-                wmc_func = self._get_wmc_func(
-                    weights=weights,
-                    semiring=semiring,
-                    perform_smoothing=perform_smoothing,
-                )
-
-            # Cover edge case e.g. node=SddNode(True)
-            modified_weights = False
-            if varcount == 1 and weights.get(1) is None:
-                modified_weights = True
-                weights[1] = (
-                    semiring.one(),
-                    semiring.zero(),
-                )  # because 1 + 0 = 1 and 1 * x = x
-
-            # Calculate result
-            query_node = (
-                node if literal is None else self.get_manager().literal(literal)
+        if wmc_func is None:
+            wmc_func = self._get_wmc_func(
+                weights=weights,
+                semiring=semiring,
+                perform_smoothing=perform_smoothing,
+                normalize=normalize
             )
-            sdd_iterator = SddIterator(
-                self.get_manager(), smooth_to_root=smooth_to_root
-            )
-            result = sdd_iterator.depth_first(query_node, wmc_func)
 
-            if weights.get(0) is not None:  # Times the weight of True
-                result = semiring.times(result, weights[0][0])
+        # print(self.sdd_to_dot(None,litnamemap={1:"bp", -1:"¬bp",2:"ap", -2:"¬ap",3:"cva", -3:"¬cva",4:"cvb", -4:"¬cvb"}))
 
-            # Restore edge case modification
-            if modified_weights:
-                weights.pop(1)
+        # Cover edge case e.g. node=SddNode(True)
+        modified_weights = False
+        if varcount == 1 and weights.get(1) is None:
+            modified_weights = True
+            weights[1] = (
+                semiring.one(),
+                semiring.zero(),
+            )  # because 1 + 0 = 1 and 1 * x = x
+
+        # Calculate result
+        if debug:
+            print("querying", node, normalize)
+        query_node = (
+            node if literal is None else self.get_manager().literal(literal)
+        )
+        sdd_iterator = SddIterator(
+            self.get_manager(), smooth_to_root=smooth_to_root
+        )
+        result = sdd_iterator.depth_first(query_node, wmc_func)
+
+        if debug:
+            print(f"queried {query_node}", result)
+            print(sdd_iterator._wmc_cache)
+            print(self.sdd_to_dot(query_node, litnamemap=self.litnamemap, show_id=True))
+            
+        # print("----")
+        # print(query_node, result)
+        # print(self.normalization_constants(semiring))
+        # print(self.get_manager().vtree().dot())
+
+        if weights.get(0) is not None:  # Times the weight of True
+            result = semiring.times(result, weights[0][0])
+
+        # Restore edge case modification
+        if modified_weights:
+            weights.pop(1)
 
         self.get_manager().set_prevent_transformation(prevent=False)
         return result
 
-    @staticmethod
-    def _get_wmc_func(weights, semiring, perform_smoothing=True):
+    def all_decision(self, vars):
+        decision = True
+        for v in vars:
+            decision = decision and self.x_constraint[abs(v)] == 1
+        all = True
+        for i in range(0,len(self.x_constraint)):
+            if self.x_constraint[i] == 1:
+                all = all and (i in vars or -i in vars)
+        return all and decision
+ 
+    # def all_defined(self, vars):
+    #     defined = True
+    #     for v in vars:
+    #         defined = defined and self.x_constraint[v] == 0
+    #     all = True
+    #     for i in range(1,len(self.x_constraint)):
+    #         if self.x_constraint[i] == 0:
+    #             all = all and i in vars
+    #     return all and defined 
+
+    # @staticmethod
+    def _get_wmc_func(self, weights, semiring, perform_smoothing=True, normalize=True):
         """
         Get the function used to perform weighted model counting with the SddIterator. Smoothing supported.
 
@@ -525,7 +543,7 @@ class SDDManager(DDManager):
         smooth_flag = perform_smoothing or semiring.is_nsp()
 
         def func_weightedmodelcounting(
-            node, rvalues, expected_prime_vars, expected_sub_vars
+            node, rvalues, expected_prime_vars, expected_sub_vars, decided
         ):
             """ Method to pass on to SddIterator's ``depth_first`` to perform weighted model counting."""
             if rvalues is None:
@@ -597,6 +615,24 @@ class SDDManager(DDManager):
                 if node is not None and not node.is_decision():
                     raise Exception("Expected a decision node for node {}".format(node))
 
+
+                normalization = semiring.one()
+                # if self.all_defined(decided):
+                    # norm = 
+                # print(node, decided, self.all_decision(decided))
+                if self.all_decision(decided) and normalize:
+                    # print("bye")
+                    mc_weights = {}
+                    for v in weights:
+                        if v in decided:
+                            mc_weights[v] = (semiring.one(), semiring.zero())
+                        elif -v in decided:
+                            mc_weights[v] = (semiring.zero(), semiring.one())
+                        else:
+                            mc_weights[v] = (semiring.one(), semiring.one())
+                    mc_decision = self.wmc(self.cycle_constraint_dd, mc_weights, semiring, normalize=False, debug=False)
+                    normalization = semiring.value(1/mc_decision)
+                
                 result_weight = None
                 for prime_weight, sub_weight, prime_vars, sub_vars in rvalues:
                     branch_weight = semiring.times(prime_weight, sub_weight)
@@ -617,19 +653,13 @@ class SDDManager(DDManager):
                                 branch_weight, missing_combined_weight
                             )
 
-                    print(node, prime_vars, sub_vars)
-                    # if xc in prime+sub
-                    #   set weights.array[self.semiring/one()]*self.varcount
-                    #   norm = mc_node()
-                    #   result = result*norm
-
                     # Add to current intermediate result
                     if result_weight is not None:
                         result_weight = semiring.plus(result_weight, branch_weight)
                     else:
                         result_weight = branch_weight
 
-                return result_weight
+                return semiring.times(result_weight, normalization)
 
         return func_weightedmodelcounting
 
@@ -947,9 +977,10 @@ class SDDEvaluator(DDEvaluator):
     def _evaluate_evidence(self, recompute=False):
         if self._evidence_weight is None or recompute:
             constraint_inode = self.formula.get_constraint_inode()
+            cycle_constraint_inode = self.formula.get_cycle_constraint_inode()
             evidence_nodes = [self.formula.get_inode(ev) for ev in self.evidence()]
             self.evidence_inode = self._get_manager().conjoin(
-                constraint_inode, *evidence_nodes
+                constraint_inode, cycle_constraint_inode, *evidence_nodes
             )
 
             pr_semiring = isinstance(
@@ -975,6 +1006,159 @@ class SDDEvaluator(DDEvaluator):
         return self._evidence_weight
 
 
+class SddIterator:
+    def __init__(self, sdd, smooth=True, smooth_to_root=False, x_vars=[]):
+        """Simple iterator to iterate over the SDD graph.
+
+        Supports smoothing: An arithmetic circuit AC(X) is smooth iff
+        (1) it contains at least one indicator for each variable in X, and
+        (2) for every child c of '+'-node n, we have vars(n) = vars(c).
+
+        Note, if you know that you will be performing WMC, smoothing can be implemented more efficient
+        by keeping track of the expected WMC of used and unused variables in the vtree instead of keeping
+        track of the sets of variables as is done in this iterator.
+
+        :param sdd: WmcManager
+        :param smooth: Perform smoothing while iterating over the graph
+        :param smooth_to_root: Perform smoothing wrt root instead of a given node
+        """
+        self.sdd = sdd  # type: SddManager
+        self.vtree = sdd.vtree()  # type: Vtree
+        self._wmc_cache = dict()  # type: Dict[SddNode, Union[float, int]]
+        # Map Vtree node positions to expected variables
+        self._expected_vars = None  # type: Optional[Dict[int, Set[int]]]
+        # Map Sdd nodes to missing variables
+        self._missing_vars = dict()  # type: Dict[SddNode, Set[int]]
+        self.smooth = smooth  # type: bool
+        self.smooth_to_root = smooth_to_root  # type: bool
+        self.x_vars = []
+
+        if self.smooth:
+            self._cache_expected_vars()
+
+    def _cache_expected_vars(self):
+        self._expected_vars = dict()
+        nb_vtree_nodes = self.sdd.var_count() * 2 - 1
+        # visited = [False] * nb_vtree_nodes
+        visited = BitArray(nb_vtree_nodes)
+        queue = deque([self.vtree])
+        while len(queue) > 0:
+            node = queue.pop()  # type: Vtree
+            pos = node.position()
+            if node.is_leaf():
+                self._expected_vars[pos] = {node.var()}
+            else:
+                if visited[pos]:
+                    self._expected_vars[pos] = self._expected_vars[node.left().position()] | \
+                                               self._expected_vars[node.right().position()]
+                else:
+                    visited[pos] = True
+                    queue.append(node)
+                    queue.append(node.right())
+                    queue.append(node.left())
+
+    def depth_first_from_root(self, func):
+        # type: (SddIterator, Callable) -> List[Union[int, float]]
+        """Depth first iterator starting from the root nodes.
+
+        See `depth_first` for more details.
+        """
+        results = []
+        for node in self.vtree.get_sdd_rootnodes(self.sdd):
+            results.append(self.depth_first(node, func))
+        return results
+
+    def depth_first(self, node, func):
+        # type: (SddIterator, SddNode, Callable) -> Union[int, float]
+        """Depth first iterator
+
+        :param node: Start node
+        :param func: Function to be called for each node:
+        ``rvalue = func(node, [(prime_rvalue, sub_rvalue, prime_vars, sub_vars)],
+                        expected_prime_vars, expected_sub_vars)``
+          The given arguments are:
+          * node: Current node, if None, it should be considered a decision node
+          * prime_rvalue: Return value from prime node
+          * sub_rvalue: Return value from sub node
+          * prime_vars: Variables present in prime
+          * sub_vars: Variables present in sub
+          * expected_prime_vars: Variables that are expected in prime
+          * expected_sub_vars: Variables that are expected in sub
+          The return value can be any type, there are no assumptions.
+          For WMC this is typically float, and for MC int.
+        :return:
+        """
+        self._wmc_cache = dict()
+        if self.smooth and self._expected_vars is None:
+            self._cache_expected_vars()
+        if self.smooth and (node.is_true() or node.is_literal()):
+            wmc = func(node, None, self._expected_vars[self.vtree.position()], set(), [])
+        else:    
+            wmc, _ = self.depth_first_rec(node, func, [])
+        if self.smooth_to_root and not (node.is_true() or node.is_literal() or node.is_false()):
+            root = self.vtree.root()
+            if root != node.vtree():
+                wmc_prime = wmc
+                wmc_sub = func(self.sdd.true(), None, None, None, [])
+                used_prime_vars = self._expected_vars[node.vtree().position()]
+                used_sub_vars = set()
+                rvalues = [(wmc_prime, wmc_sub, used_prime_vars, used_sub_vars)]
+                expected_prime_vars = used_prime_vars
+                expected_sub_vars = self._expected_vars[root.position()] - used_prime_vars
+                wmc = func(None, rvalues, expected_prime_vars, expected_sub_vars, [])
+        return wmc
+
+    def depth_first_rec(self, node, func, decided):
+        # print(node,decided)
+        # type: (SddIterator, SddNode, Callable) -> Union[int, float]
+        cache_entry = (node, frozenset(decided))
+        if cache_entry in self._wmc_cache:
+            return self._wmc_cache[cache_entry]
+        if node.is_false():
+            result = func(node, None, None, None, [])
+            self._wmc_cache[cache_entry] = (result, [])
+            return result, []
+        if node.is_true():
+            result = func(node, None, None, None, [])
+            self._wmc_cache[cache_entry] = result, []
+            return result, []
+        vtree = node.vtree()
+        if node.is_decision():
+            rvalues = []
+            vtree_left = vtree.left()
+            if not self.smooth or vtree_left is None:
+                expected_prime_vars = set()
+            else:
+                expected_prime_vars = self._expected_vars[vtree_left.position()]
+            vtree_right = vtree.right()
+            if not self.smooth or vtree_right is None:
+                expected_sub_vars = set()
+            else:
+                expected_sub_vars = self._expected_vars[vtree_right.position()]
+            for prime, sub in node.elements():
+                wmc_prime, dec_prime = self.depth_first_rec(prime, func, decided)
+                wmc_sub, dec_sub = self.depth_first_rec(sub, func, decided+dec_prime)
+                if not self.smooth:
+                    used_prime_vars = None
+                    used_sub_vars = None
+                else:
+                    if prime.vtree() is None:
+                        used_prime_vars = set()
+                    else:
+                        used_prime_vars = self._expected_vars[prime.vtree().position()]
+                    if sub.vtree() is None:
+                        used_sub_vars = set()
+                    else:
+                        used_sub_vars = self._expected_vars[sub.vtree().position()]
+                rvalues.append((wmc_prime, wmc_sub, used_prime_vars, used_sub_vars))
+            rvalue = (func(node, rvalues, expected_prime_vars, expected_sub_vars, decided), decided)
+        else:
+            rvalue = func(node, None, None, None, decided), [node.literal]
+        if self._wmc_cache is not None:
+            self._wmc_cache[cache_entry] = rvalue
+        return rvalue
+
+
 @transform(LogicDAG, SDD)
 def build_sdd(source, destination, **kwdargs):
     """Build an SDD from another formula.
@@ -986,8 +1170,13 @@ def build_sdd(source, destination, **kwdargs):
     :param kwdargs: extra arguments
     :return: destination
     """
+    a = [1,2]
+    xc = x_constrained(a)
     init_varcount = kwdargs.get("init_varcount", -1)
-    destination.init_varcount = (
-        init_varcount if init_varcount != -1 else source.atomcount
-    )
+    init_varcount = init_varcount if init_varcount != -1 else source.atomcount
+    destination = SDD(var_constraint = xc, init_varcount=init_varcount)
+    # 
+    # destination.init_varcount = (
+    #     init_varcount if init_varcount != -1 else source.atomcount
+    # )
     return build_dd(source, destination, **kwdargs)

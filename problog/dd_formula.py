@@ -26,7 +26,7 @@ from __future__ import print_function
 
 
 from .util import Timer, mktempfile
-from .formula import LogicFormula, atom, LogicNNF
+from .formula import LogicGraph, atom, LogicNNF
 from .evaluator import (
     EvaluatableDSP,
     Evaluator,
@@ -37,16 +37,18 @@ from .evaluator import (
 from .errors import InconsistentEvidenceError
 
 
-class DD(LogicFormula, EvaluatableDSP):
+class DD(LogicGraph, EvaluatableDSP):
     """Root class for bottom-up compiled decision diagrams."""
 
     def __init__(self, **kwdargs):
-        LogicFormula.__init__(self, **kwdargs)
+        LogicGraph.__init__(self, **kwdargs)
 
         self.inode_manager = None
 
         self.atom2var = {}  # index to node
         self.var2atom = {}
+
+        self.lnm = {}
 
         # self._constraint_dd = None
 
@@ -90,10 +92,10 @@ class DD(LogicFormula, EvaluatableDSP):
             while len(mgr.nodes) < index:
                 mgr.nodes.append(None)
             result = mgr.nodes[index - 1]
+            print(">>",mgr.nodes,result)
             if result is None:
                 result = self._create_inode(node)
                 mgr.nodes[index - 1] = result
-            # print(">", index, result)
         return mgr.negate(result) if negate else result
 
     def _create_inode(
@@ -126,6 +128,13 @@ class DD(LogicFormula, EvaluatableDSP):
         else:
             return self.get_manager().constraint_dd
 
+    def get_cycle_constraint_inode(self):
+        """Get the internal node representing the constraints for this formula."""
+        if self.get_manager().cycle_constraint_dd is None:
+            return self.get_manager().true()
+        else:
+            return self.get_manager().cycle_constraint_dd
+
     def _create_evaluator(self, semiring, weights, **kwargs):
         if semiring.is_nsp():
             return FormulaEvaluatorNSP(self.to_formula(), semiring, weights)
@@ -141,11 +150,12 @@ class DD(LogicFormula, EvaluatableDSP):
             [abs(n) for q, n, l in self.labeled() if self.is_probabilistic(n)]
         )  # TODO self.evidence_all() ipv self.labeled() ? see forward.py
 
-        for n in required_nodes:
-            print(n, self.get_inode(n))
+        # for n in [abs(i) for i, n, l in self]:
+        #     print(n, self.get_inode(n))
 
-        # print(self.sdd_to_dot(self.get_manager().get_manager().root, show_id=True))
         self.build_constraint_dd()
+        # print(self.get_manager().get_manager().dot(self.get_manager().get_manager().root))
+        # print("-0-")
 
     def build_constraint_dd(self):
         """Build the internal representation of the constraint of this formula."""
@@ -155,12 +165,32 @@ class DD(LogicFormula, EvaluatableDSP):
                 rule_sdd = self.get_manager().disjoin(
                     *[self.get_inode(r) for r in rule]
                 )
+                # e = self.get_inode(rule[0])
+                # print(e)
+                # print(self.sdd_to_dot(e,  litnamemap=self.lnm, show_id=True))
+                # print(self.get_manager().get_manager().dot(e, show_id=True))
+                # print("---")
                 new_constraint_dd = self.get_manager().conjoin(
                     self.get_manager().constraint_dd, rule_sdd
                 )
+                # print(self.get_manager().get_manager().dot(self.get_manager().nodes[10]))
+                # print(self.get_manager().nodes)
+                # print("-------")
                 self.get_manager().deref(self.get_manager().constraint_dd)
                 self.get_manager().deref(rule_sdd)
                 self.get_manager().constraint_dd = new_constraint_dd
+        self.get_manager().cycle_constraint_dd = self.get_manager().true()
+        for c in self.cycle_constraints():
+            for rule in c.as_clauses():
+                rule_sdd = self.get_manager().disjoin(
+                    *[self.get_inode(r) for r in rule]
+                )
+                new_constraint_dd = self.get_manager().conjoin(
+                    self.get_manager().cycle_constraint_dd, rule_sdd
+                )
+                self.get_manager().deref(self.get_manager().cycle_constraint_dd)
+                self.get_manager().deref(rule_sdd)
+                self.get_manager().cycle_constraint_dd = new_constraint_dd
 
     def to_dot(self, *args, **kwargs):
         if kwargs.get("use_internal"):
@@ -189,6 +219,7 @@ class DDManager(object):
             []
         )  # Stores inodes (only conjoin and disjoin, the remaining atoms are in formula.atom2var)
         self.constraint_dd = None
+        self.cycle_constraint_dd = None
 
     def set_node(self, index, node):
         self.nodes[index] = node
@@ -459,9 +490,10 @@ class DDEvaluator(Evaluator):
     def _evaluate_evidence(self, recompute=False):
         if self._evidence_weight is None or recompute:
             constraint_inode = self.formula.get_constraint_inode()
+            cycle_constraint_inode = self.formula.get_cycle_constraint_inode()
             evidence_nodes = [self.formula.get_inode(ev) for ev in self.evidence()]
             self.evidence_inode = self._get_manager().conjoin(
-                constraint_inode, *evidence_nodes
+                constraint_inode, cycle_constraint_inode, *evidence_nodes
             )
 
             if isinstance(self.semiring, SemiringLogProbability) or isinstance(
@@ -515,15 +547,21 @@ class DDEvaluator(Evaluator):
             result = self.semiring.zero()
         else:
             query_def_inode = self.formula.get_inode(node)
+            print("qnode ", query_def_inode)
+            # print( self.formula.sdd_to_dot(query_def_inode, litnamemap=self.formula.lnm, show_id=True))
+            # print(self.formula.sdd_to_dot(self.formula.get_inode(11), litnamemap=self.formula.lnm, show_id=True))
             evidence_inode = self.evidence_inode
             # Construct the query SDD
             # if not evidence propagated or (query and evidence share variables):
             query_sdd = self._get_manager().conjoin(query_def_inode, evidence_inode)
+            # print("got", query_sdd)
+
+            # print(node, query_sdd, self.formula.sdd_to_dot(None, litnamemap=self.formula.lnm, show_id=True))
             # else:
             #    query_sdd = query_def_inode
-
             result = self._get_manager().wmc(query_sdd, self.weights, self.semiring)
             self._get_manager().deref(query_sdd)
+            # print(self.formula.sdd_to_dot(self.formula.get_inode(11), litnamemap=self.formula.lnm, show_id=True))
             # TODO only normalize when there are evidence or constraints.
             result = self.semiring.normalize(result, self.normalization)
             result = self.semiring.normalize(result, self._evidence_weight)
@@ -616,7 +654,7 @@ def build_dd(source, destination, **kwdargs):
     with Timer("Compiling %s" % destination.__class__.__name__):
 
         translate = {}
-        mgr = destination.get_manager().get_manager()
+        destination.vtree = source.vtree
         for i, n, t in source:
             if t == "atom":
                 j = destination.add_atom(
@@ -640,17 +678,39 @@ def build_dd(source, destination, **kwdargs):
         # Copy constraints
         for c in source.constraints():
             destination.add_constraint(c.copy(translate))
+        for c in source.cycle_constraints():
+            destination.add_cycle_constraint(c.copy(translate))
+
+        destination.lnm = {'true':'T', 'false':'F', 'mult': '∧', 'add' : '∨' }
+        for v in destination.var2atom:
+            name = str(destination.get_name(destination.var2atom[v]))
+            n = name.replace('algebraic_atom((0, 0, 0),set(none),ap,"0.4")', "ap")
+            n = n.replace('algebraic_atom((1, 0, 0),set(none),bp,"0.6")', "bp")
+            n = n.replace("problog_cv_b_2_4", "cvb")
+            n = n.replace("problog_cv_a_2_4", "cva")
+            n = n.replace("problog_cv_b_4_3", "cvb")
+            n = n.replace("problog_cv_a_4_3", "cva")
+            destination.lnm[v] = n
+            destination.lnm[-v] = f"¬{n}"
+        destination.get_manager().litnamemap = destination.lnm
+        # destination.lnm[1] = "bp"
+        # destination.lnm[2] = "ap"
+        # destination.lnm[-1] = "¬bp"
+        # destination.lnm[-2] = "¬ap"
 
         destination.build_dd()
 
-    print(destination.var2atom)
-    lnm = {'true':'T', 'false':'F', 'mult': '∧', 'add' : '∨' }
-    for v in destination.var2atom:
-        lnm[v] = destination.get_name(destination.var2atom[v])
-        lnm[-v] = f"¬{destination.get_name(destination.var2atom[v])}"
-    print(lnm)
-    print(destination.sdd_to_dot(destination.get_inode(13), litnamemap=lnm, show_id=True))
-    print(destination.sdd_to_dot(destination.get_inode(12), litnamemap=lnm, show_id=True))
+    # print(destination.sdd_to_dot(destination.get_inode(7), litnamemap=destination.lnm, show_id=True))
+    # print(destination.sdd_to_dot(destination.get_inode(11), litnamemap=destination.lnm, show_id=True))
+    # print(destination.sdd_to_dot(destination.get_manager().cycle_constraint_dd, litnamemap=destination.lnm, show_id=True))
     # print("root:", mgr.get_vars(15))
     # print(">>>", mgr.model_count(mgr.root))
+    # print(destination.sdd_to_dot(None, litnamemap=destination.lnm))
+    # print(destination.sdd_to_dot(None, litnamemap=destination.lnm, show_id=True))
+    # print("models c:", mgr.model_count(destination.get_manager().constraint_dd))
+    # print("2", destination.evaluate(2))
+    # print(destination.weights)
+    # print(destination.sdd_to_dot(destination.get_inode(2), litnamemap=destination.lnm, show_id=True))
+    # for n in [abs(i) for i, n, l in destination]:
+    #     print(n, destination.evaluate(n))
     return destination

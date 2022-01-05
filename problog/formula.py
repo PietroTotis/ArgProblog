@@ -66,6 +66,7 @@ class BaseFormula(ProbLogObject):
         self._weights = {}               # Node weights: dict(key: Term)
 
         self._constraints = []           # Constraints: list of Constraint
+        self._cycle_constraints = []           # Constraints: list of Constraint
 
         #self._names = defaultdict(OrderedDict)  # Node names: dict(label: dict(key, Term))
         self._names = defaultdict(dict)
@@ -402,6 +403,13 @@ class BaseFormula(ProbLogObject):
         """
         return self._constraints
 
+    def cycle_constraints(self):
+        """Return the list of cycle onstraints.
+
+        :return: list of constraints
+        """
+        return self._cycle_constraints
+
     def add_constraint(self, constraint):
         """Add a constraint
 
@@ -409,6 +417,14 @@ class BaseFormula(ProbLogObject):
         :type constraint: problog.constraint.Constraint
         """
         self._constraints.append(constraint)
+
+    def add_cycle_constraint(self, constraint):
+        """Add a cycle constraint
+
+        :param constraint: cycle constraint to add
+        :type constraint: problog.constraint.Constraint
+        """
+        self._cycle_constraints.append(constraint)
 
     def flag(self, flag):
         flag = "_%s" % flag
@@ -468,6 +484,8 @@ class LogicFormula(BaseFormula):
     ):
         BaseFormula.__init__(self)
 
+
+        self.vtree = None # vtree for the formula
         # List of nodes
         self._nodes = []
         # Lookup index for 'atom' nodes, key is identifier passed to addAtom()
@@ -490,6 +508,7 @@ class LogicFormula(BaseFormula):
         self._max_arity = max_arity
 
         self._constraints_me = {}
+        self._cycle_constraints_me = {}
 
         self.semiring = propagate_weights
 
@@ -902,6 +921,10 @@ class LogicFormula(BaseFormula):
     def constraints(self):
         """Returns a list of all constraints."""
         return list(self._constraints_me.values()) + BaseFormula.constraints(self)
+        
+    def cycle_constraints(self):
+        """Returns a list of all constraints."""
+        return list(self._cycle_constraints_me.values()) + BaseFormula.cycle_constraints(self)
 
     # ====================================================================================== #
     # ==========                      EVIDENCE PROPAGATION                       =========== #
@@ -1140,6 +1163,13 @@ class LogicFormula(BaseFormula):
                 if f:
                     f = False
                     s += "\nConstraints : "
+                s += "\n* " + str(c)
+        f = True
+        for c in self.cycle_constraints():
+            if c.is_nontrivial():
+                if f:
+                    f = False
+                    s += "\nCycle constraints : "
                 s += "\n* " + str(c)
         return s + "\n"
 
@@ -1737,12 +1767,13 @@ class LogicDAG(LogicFormula):
 
 class LogicGraph(LogicFormula):
 
-    def __init__(self, cnf_file=None, auto_compact=True, **kwdargs):
+    def __init__(self, cnf_str=None, auto_compact=True, **kwdargs):
         LogicFormula.__init__(self, auto_compact, **kwdargs)
         self.founded_vars = set()
         self.scc = {}
         self.in_neg_cycles = None
-        self.cnf_file = cnf_file
+        self.cnf_str = cnf_str
+        self.defined = [] # defined vars
 
     def get_in_neg_cycles(self):
         if self.in_neg_cycles is None:

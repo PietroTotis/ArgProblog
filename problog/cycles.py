@@ -196,7 +196,7 @@ def break_neg_cycles(source, target, translation=None, **kwdargs):
     :return: target
     """
     logger = logging.getLogger("problog")
-    print("cb")
+    target.vtree = source.vtree
     with Timer("Cycle breaking"):
         # cycles_broken = {k:[] for k in range(1,len(source))}
         content = set()
@@ -207,6 +207,7 @@ def break_neg_cycles(source, target, translation=None, **kwdargs):
             newnode, broken, visited = _break_neg_cycles(
                 source, target, n, [], None, content, translation
             )
+            # print(n, "finished: ", visited)
             # for c in broken:
             #     if c in cycles_broken:
             #         cycles_broken[c] = cycles_broken[c]+broken[c]
@@ -231,56 +232,67 @@ def _break_neg_cycles(
     node = source.get_node(nodeid)
     nodetype = type(node).__name__
 
-    print(nodeid, nodetype, ancestors)
+    # print(nodeid, nodetype, ancestors)
 
     if nodeid in ancestors:
         cycle_nodes = ancestors[ancestors.index(nodeid):]
         cycle = "_".join([str(i) for i in cycle_nodes])
-        print("cycle", nodeid, ancestors, cycle)
+        # print("cycle", nodeid, ancestors, cycle)
         # if cycle not in cycles_broken:
-        newname = node.name
-        newfunc1 = cycle_var_prefix + newname.functor + "_cb1_" + cycle
-        newfunc2 = cycle_var_prefix + newname.functor + "_cb2_" + cycle
-        newname1 = Term(newfunc1, *newname.args)
-        newname2 = Term(newfunc2, *newname.args)
-        newnode1 = target.add_atom(newfunc1, probability=0.5, name=newname1)
-        newnode2 = target.add_atom(newfunc2, probability=0.5, name=newname2)
-        # print("adding ", newnode2, " to chiuldren of ", node.name)
-        children = []
-        for a in ancestors:
-            print(target.get_node(a))
-            n = target.get_node(a)
-            if type(n).__name__ == "disj":
-                achildren = [target.negate(c) for c in n.children if c not in ancestors]
-            else: #conj
-                achildren = [c for c in n.children if c not in ancestors]
-            children += achildren
-        oid1 = target.add_or(children+[newnode1], name=newname1)
-        oid2 = target.add_or(children+[newnode2], name=newname2)
-        c1 = target.add_and([-newnode1, newnode2])
-        c2 = target.add_and([newnode1, -newnode2])
-        c  = target.add_or([c1,c2], name = Term(f"choice_{newnode1}_{newnode2}"))
-        target.add_constraint(TrueConstraint(c))
-        return newnode1, {(oid1,oid2)}, content
+        newname1 = source.get_node(ancestors[-1]).name
+        newname2 = node.name
+        newfunc1 = cycle_var_prefix + newname1.functor + "_" + cycle
+        newfunc2 = cycle_var_prefix + newname2.functor + "_" + cycle
+        newname1 = Term(newfunc1, *newname1.args)
+        newname2 = Term(newfunc2, *newname2.args)
+        newnode1 = target.add_atom(newfunc1, probability=target.WEIGHT_NEUTRAL, name=newname1)
+        newnode2 = target.add_atom(newfunc2, probability=target.WEIGHT_NEUTRAL, name=newname2)
+        # c1 = target.add_and([-newnode1, newnode2])
+        # c2 = target.add_and([newnode1, -newnode2])
+        # c  = target.add_or([c1,c2], name = Term(f"choice_{newnode1}_{newnode2}"))
+        # target.add_constraint(TrueConstraint(c))
+        cycle_info = [(ancestors[-1], ancestors[-2], newnode1, newnode2)]
+        return newnode2, cycle_info, content
+        # print("adding ", newnode2, " to children of ", node.name)
+        # children = []
+        # for a in ancestors:
+        #     print(a, source.get_node(a), len(target))
+        #     print(target.get_node(a))
+        #     n = target.get_node(a)
+        #     if type(n).__name__ == "disj":
+        #         achildren = [target.negate(c) for c in n.children if c not in ancestors]
+        #     else: #conj
+        #         achildren = [c for c in n.children if c not in ancestors]
+        #     children += achildren
+        # oid1 = target.add_and(children+[newnode1], name=newname1)
+        # oid2 = target.add_and(children+[newnode2], name=newname2)
+        # c1 = target.add_and([-newnode1, newnode2])
+        # c2 = target.add_and([newnode1, -newnode2])
+        # c  = target.add_or([c1,c2], name = Term(f"choice_{newnode1}_{newnode2}"))
+        # target.add_constraint(TrueConstraint(c))
+        # return oid1, {(oid1,oid2)}, content
     else:
-        broken_cycles = set()
+        broken_cycles = []
+        constraints = []
         if nodeid in content:
-            print(translation[nodeid], nodeid, content)
-            return translation[nodeid]
-        content |= {nodeid}
+            # print(nodeid, " visited")
+            id, cb, cont = translation[nodeid]
+            # cycles_broken += cb #fixme
+            content |= cont
+            return id, cb, content
+        content.add(nodeid)
         if nodetype == "atom":
-            print(nodeid, "atom")
-            if nodeid in translation:
-                newnode, cb, cont = translation[nodeid]
-                content |= newnode
-                if negative_node:
-                    return target.negate(newnode), cb, content
-                else:
-                    return newnode, cb, content
-            else:
-                newnode = target.add_atom(
-                    node.identifier, node.probability, node.group, node.name
-                )
+            # if nodeid in translation:
+            #     newnode, cb, cont = translation[nodeid]
+            #     content |= {newnode}
+            #     if negative_node:
+            #         return target.negate(newnode), cb, content
+            #     else:
+            #         return newnode, cb, content
+            # else:
+            newnode = target.add_atom(
+                node.identifier, node.probability, node.group, node.name
+            )
         else:
             children = []
             for child in node.children:
@@ -294,15 +306,26 @@ def _break_neg_cycles(
                         translation,
                         is_evidence,
                     )
-                if len(child_broken_cycles) == 0:
-                    children.append(new_c)
-                else:
-                    for choices in child_broken_cycles:
-                        if len(choices) < 2:
-                            children.append(choices[0])
+                skip = False
+                for cycle in child_broken_cycles:
+                    if cycle[0] == nodeid:
+                        if child < 0:
+                            children.append(target.negate(cycle[3]))
                         else:
-                            children.append(new_c)
-                            broken_cycles |= {(choices[1],)}
+                            children.append(cycle[3])
+                        constraints.append(cycle[2])
+                        skip = skip or abs(child) == cycle[1]
+                        broken_cycles.append(cycle)
+                    if cycle[1] == nodeid:
+                        if child < 0:
+                            children.append(target.negate(cycle[2]))
+                        else:
+                            children.append(cycle[2])
+                        constraints.append(cycle[3])
+                        skip = skip or abs(child) == cycle[0]
+                if not skip:
+                    children.append(new_c)
+                # broken_cycles += child_broken_cycles
                 content |= content_c
             newname = node.name
             if nodetype == "conj":
@@ -311,6 +334,12 @@ def _break_neg_cycles(
                 newnode = target.add_or(children, name=newname)
 
         translation[nodeid] = (newnode, broken_cycles, content)
+
+        for k in constraints:
+            c1 = target.add_and([newnode, k])
+            c2 = target.add_and([-newnode, -k])
+            c  = target.add_or([c1,c2], name = Term(f"iff_{newnode}_{k}"))
+            target.add_cycle_constraint(TrueConstraint(c))
 
         # print(content, cycles_broken)
         if negative_node:
