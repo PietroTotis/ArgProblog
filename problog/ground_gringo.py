@@ -64,8 +64,11 @@ def ground_to_cb_graph(model, target=None, queries=[], evidence=[], propagate_ev
 
     smodels = SmodelsParser(ground, target=target, queries=queries, evidence=evidence)
     ground_program = smodels.smodels2problog()
+    # for s in ground_program:
+    #     print(s)
     cnf, lp_string = aspmc(ground_program.to_prolog())
     (_, v3) = concom.tree_from_cnf(cnf, tree_type=vtree.Vtree)
+    # print(lp_string)
 
     queries_tuples = [q.args for q in ground_program if q.is_query()]
     queries = [p for q in queries_tuples for p in q]
@@ -434,6 +437,7 @@ class SmodelsParser:
                 id = -logic_graph.get_node_by_name(atom.with_probability())
             else:
                 if literal.functor.startswith("gringo"):
+                    # print(literal, self.gringo_facts)
                     # if it is a rule probability use new atom every time
                     for id, t in self.gringo_facts.items():
                         if literal.functor == t.functor:
