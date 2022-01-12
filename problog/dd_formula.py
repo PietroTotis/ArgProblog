@@ -92,7 +92,7 @@ class DD(LogicGraph, EvaluatableDSP):
             while len(mgr.nodes) < index:
                 mgr.nodes.append(None)
             result = mgr.nodes[index - 1]
-            print(">>",mgr.nodes,result)
+            # print(">>",mgr.nodes,result)
             if result is None:
                 result = self._create_inode(node)
                 mgr.nodes[index - 1] = result
@@ -561,7 +561,8 @@ class DDEvaluator(Evaluator):
             #    query_sdd = query_def_inode
             result = self._get_manager().wmc(query_sdd, self.weights, self.semiring)
             self._get_manager().deref(query_sdd)
-            # print(self.formula.sdd_to_dot(self.formula.get_inode(11), litnamemap=self.formula.lnm, show_id=True))
+            print(self._get_manager().get_manager().vtree().dot())
+            print(self.formula.atom2var)
             # TODO only normalize when there are evidence or constraints.
             result = self.semiring.normalize(result, self.normalization)
             result = self.semiring.normalize(result, self._evidence_weight)

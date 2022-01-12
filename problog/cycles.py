@@ -196,6 +196,8 @@ def break_neg_cycles(source, target, translation=None, **kwdargs):
     :return: target
     """
     logger = logging.getLogger("problog")
+    print(source.to_prolog())
+    print("*********")
     target.vtree = source.vtree
     with Timer("Cycle breaking"):
         # cycles_broken = {k:[] for k in range(1,len(source))}
@@ -215,6 +217,8 @@ def break_neg_cycles(source, target, translation=None, **kwdargs):
             #         cycles_broken[c] = broken[c]
             content |= visited
             target.add_name(q, newnode, l)
+        print(target.to_prolog())
+        print(target)
         return target
 
 def _break_neg_cycles(
@@ -237,7 +241,7 @@ def _break_neg_cycles(
     if nodeid in ancestors:
         cycle_nodes = ancestors[ancestors.index(nodeid):]
         cycle = "_".join([str(i) for i in cycle_nodes])
-        # print("cycle", nodeid, ancestors, cycle)
+        print("cycle", nodeid, ancestors, cycle)
         # if cycle not in cycles_broken:
         newname1 = source.get_node(ancestors[-1]).name
         newname2 = node.name

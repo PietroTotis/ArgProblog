@@ -16,6 +16,7 @@ trash/
 /problog/bin/linux/c2d
 /problog/bin/java/
 /problog/aspmc
+/problog/aspmc2
 /problog/bin/linux/c2d
 
 sandbox/
@@ -25,6 +26,7 @@ test-reports/
 problog/lib/python2/
 problog/lib/python3/
 problog/aspmc
+problog/aspmc2
 
 .DS_Store
 

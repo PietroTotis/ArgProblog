@@ -264,9 +264,9 @@ class SDDManager(DDManager):
         if var_constraint is not None and varcount > 1:
             self.x_constraint = self._to_x_constrained_list(varcount, var_constraint)
             vtree = Vtree.new_with_X_constrained(
-                var_count=varcount, is_X_var=self.x_constraint, vtree_type="balanced"
+                var_count=varcount, is_X_var=self.x_constraint, vtree_type="right"
             )
-
+            # print(">>>>>>>",vtree.dot())
         self.__manager = sdd.SddManager(
             var_count=varcount, auto_gc_and_minimize=auto_gc, vtree=vtree
         )
@@ -477,8 +477,8 @@ class SDDManager(DDManager):
             )  # because 1 + 0 = 1 and 1 * x = x
 
         # Calculate result
-        if debug:
-            print("querying", node, normalize)
+        # if debug:
+        #     print("querying", node, normalize)
         query_node = (
             node if literal is None else self.get_manager().literal(literal)
         )
@@ -487,10 +487,10 @@ class SDDManager(DDManager):
         )
         result = sdd_iterator.depth_first(query_node, wmc_func)
 
-        if debug:
-            print(f"queried {query_node}", result)
-            print(sdd_iterator._wmc_cache)
-            print(self.sdd_to_dot(query_node, litnamemap=self.litnamemap, show_id=True))
+        # if debug:
+        #     print(f"queried {query_node}", result)
+            # print(sdd_iterator._wmc_cache)
+            # print(self.sdd_to_dot(query_node, litnamemap=self.litnamemap, show_id=True))
             
         # print("----")
         # print(query_node, result)
@@ -617,11 +617,7 @@ class SDDManager(DDManager):
 
 
                 normalization = semiring.one()
-                # if self.all_defined(decided):
-                    # norm = 
-                # print(node, decided, self.all_decision(decided))
                 if self.all_decision(decided) and normalize:
-                    # print("bye")
                     mc_weights = {}
                     for v in weights:
                         if v in decided:
@@ -630,8 +626,9 @@ class SDDManager(DDManager):
                             mc_weights[v] = (semiring.zero(), semiring.one())
                         else:
                             mc_weights[v] = (semiring.one(), semiring.one())
-                    mc_decision = self.wmc(self.cycle_constraint_dd, mc_weights, semiring, normalize=False, debug=False)
+                    mc_decision = self.wmc(node, mc_weights, semiring, normalize=False, debug=False)
                     normalization = semiring.value(1/mc_decision)
+                # print(node, decided, self.all_decision(decided), normalization)
                 
                 result_weight = None
                 for prime_weight, sub_weight, prime_vars, sub_vars in rvalues:

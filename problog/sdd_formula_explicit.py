@@ -99,7 +99,9 @@ class SDDExplicit(SDD):
 
         self.build_constraint_dd()
         constrained_node = self.get_manager().constraint_dd
+        cycle_constrained_node = self.get_manager().cycle_constraint_dd
         self._root = root_node.conjoin(constrained_node)
+        self._root = root_node.conjoin(cycle_constrained_node)
 
     # def cleanup_inodes(self):
     #    """
@@ -184,6 +186,7 @@ class SDDExplicitManager(SDDManager):
 class SDDExplicitEvaluator(SDDEvaluator):
     def __init__(self, formula, semiring, weights=None, **kwargs):
         SDDEvaluator.__init__(self, formula, semiring, weights, **kwargs)
+        # print(self.formula.sdd_to_dot(self.formula.get_manager().cycle_constraint_dd, litnamemap=self.formula.lnm, show_id=True))
 
     def propagate(self):
         self._initialize()
@@ -195,6 +198,7 @@ class SDDExplicitEvaluator(SDDEvaluator):
             self._evidence_weight = self._evaluate_root()
             if self.semiring.is_zero(self._evidence_weight):
                 raise InconsistentEvidenceError(context=" during compilation")
+        print("Ev weight", self._evidence_weight)
         return self._evidence_weight
 
     def evaluate_fact(self, node):
@@ -204,6 +208,7 @@ class SDDExplicitEvaluator(SDDEvaluator):
         return self.evaluate(self, node)
 
     def evaluate(self, node, normalize=True):
+        print("evaluating ", node, self._evidence_weight)
         # Trivial case: node is deterministically True or False
         if node == self.formula.TRUE:
             if not self.semiring.is_nsp():
@@ -221,21 +226,23 @@ class SDDExplicitEvaluator(SDDEvaluator):
             index = self.formula.atom2var[abs(node)]
             p_orig, n_orig = self.weights.get(index)
             self._set_value(index, (node > 0))
+            # for c in self.formula.cycle_constraints():
+            #     self._set_value(c.node, (c.node > 0))
 
             # Calculate result
-            # print("weights: %s" % self.weights)
+            print("weights: %s" % self.weights)
             result = self._evaluate_root()
 
             # Restore query weight
             self.set_weight(index, p_orig, n_orig)
 
-            # print("result: %s" % result)
-            # print("normalization: %s" % self._get_z())
-            # print("normalizing %s with %s and result before %s" % (normalize, self._get_z(), result))
+            print("result: %s" % result)
+            print("normalization: %s" % self._get_z())
+            print("normalizing %s with %s and result before %s" % (normalize, self._get_z(), result))
             if normalize:
                 result = self.semiring.normalize(result, self._get_z())
-            # print("normalized result: %s" % result)
-            # print("----------------------------------------")
+            print("normalized result: %s" % result)
+            print("----------------------------------------")
 
         return self.semiring.result(result, self.formula)
 
@@ -293,9 +300,19 @@ def build_explicit_from_logicdag(source, destination, **kwdargs):
     :rtype: SDDExplicit
     """
 
+    print(source)
+    print("---")
+
     # Get init varcount
     init_varcount = kwdargs.get("init_varcount", -1)
     var_constraint_named = kwdargs.get("var_constraint", None)
+    
+    vcn = []
+    for _, clause, c_type in source:
+        if c_type == "atom":
+            if type(clause.probability) != bool:
+                vcn.append(clause.name)
+    var_constraint_named =  x_constrained_named(vcn)
 
     if var_constraint_named is not None and isinstance(
         var_constraint_named, x_constrained_named
@@ -446,8 +463,18 @@ def build_explicit_from_logicdag(source, destination, **kwdargs):
         else:
             root_key = None
 
+        rename = {n:node_to_indicator[line_map[n][2]] for n in line_map if line_map[n][2] in node_to_indicator}
+        # Copy constraints
+        for c in source.constraints():
+            destination.add_constraint(c.copy(rename))
+        for c in source.cycle_constraints():
+            destination.add_cycle_constraint(c.copy(rename))
+
         destination.build_dd(root_key)
         # destination.cleanup_inodes()
+        print(destination)
+        print(node_to_indicator)
+        print(destination.labeled())
     return destination
 
 
