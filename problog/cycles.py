@@ -198,6 +198,7 @@ def break_neg_cycles(source, target, translation=None, **kwdargs):
     :return: target
     """
     logger = logging.getLogger("problog")
+    # print(source)
     # print(source.to_prolog())
     # print("*********")
     target.vtree = source.vtree
@@ -226,6 +227,7 @@ def _break_neg_cycles(
     content,
     translation,
     is_evidence=False,
+    lvl = 0
 ):
     negative_node = nodeid < 0
     nodeid = abs(nodeid)
@@ -283,6 +285,8 @@ def _break_neg_cycles(
                 node.identifier, node.probability, node.group, node.name
             )
         else:
+            # ind = "  " * lvl
+            # print(ind, nodeid, node.children)
             children = []
             for child in node.children:
                 new_c, child_broken_cycles, content_c = _break_neg_cycles(
@@ -294,6 +298,7 @@ def _break_neg_cycles(
                         content,
                         translation,
                         is_evidence,
+                        lvl = lvl +1
                     )
                 skip = False
                 for cycle in child_broken_cycles:
@@ -306,7 +311,7 @@ def _break_neg_cycles(
                         else:
                             children.append(cycle[3])
                         constraints.append(cycle[2])
-                        skip = skip or abs(child) == cycle[1]
+                        skip = skip or True
                         broken_cycles.append(cycle) # and propagate the info for the second var
                     elif cycle[1] == nodeid:
                         """
@@ -316,7 +321,7 @@ def _break_neg_cycles(
                             children.append(target.negate(cycle[2]))
                         else:
                             children.append(cycle[2])
-                        skip = skip or abs(child) == cycle[0]
+                        skip = skip or True
                         if cycle[4] == nodeid: # if newnode2 is for this node add constraints and forget
                             constraints.append(cycle[3])
                         else:  # move upwards until we find the origin of the cycle
@@ -325,14 +330,17 @@ def _break_neg_cycles(
                         constraints.append(cycle[3])
                     else:  # move upwards until we find the origin of the cycle
                         broken_cycles.append(cycle)
+                # print(ind, nodeid, child, skip, children, broken_cycles)
                 if not skip:
                     children.append(new_c)
                 content |= content_c
+            # print(ind, "children of ", nodeid, ":", children)
             newname = node.name
             if nodetype == "conj":
                 newnode = target.add_and(children, name=newname)
             else:
                 newnode = target.add_or(children, name=newname)
+            # print(ind, "newid for ", nodeid, ":", newnode)
 
         translation[nodeid] = (newnode, broken_cycles, content)
 
