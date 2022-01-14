@@ -80,7 +80,7 @@ class SimpleDDNNFEvaluator(Evaluator):
         self.multi_sm = {}
         self.valid_choices = set()
         self.pasp = kwargs["pasp"]
-        print(formula.to_dot())
+        # print(formula.to_dot())
 
         if not self.pasp:
             self.multi_stable_models()

@@ -23,7 +23,10 @@ Interface to Sentential Decision Diagrams (SDD) using the explicit encoding repr
     limitations under the License.
 """
 from __future__ import print_function
+import sys
+import os
 from collections import namedtuple
+sys.path.append(os.path.join(os.path.dirname(__file__), 'aspmc'))
 
 from .formula import LogicDAG, LogicFormula
 from .core import transform
@@ -33,6 +36,7 @@ from .evaluator import SemiringProbability, SemiringLogProbability
 from .sdd_formula import SDDEvaluator, SDD, x_constrained
 from .forward import _ForwardSDD, ForwardInference
 from .sdd_formula import SDDManager
+
 
 from .util import mktempfile
 
@@ -102,6 +106,7 @@ class SDDExplicit(SDD):
         cycle_constrained_node = self.get_manager().cycle_constraint_dd
         self._root = root_node.conjoin(constrained_node)
         self._root = root_node.conjoin(cycle_constrained_node)
+        # print("SDD built")
 
     # def cleanup_inodes(self):
     #    """
@@ -140,7 +145,6 @@ class SDDExplicit(SDD):
             merge_leafs=merge_leafs,
         )
 
-
 class SDDExplicitManager(SDDManager):
     """
     Manager for SDDs with one root which use the explicit encoding, for example where c :- a,b is represented as
@@ -148,7 +152,7 @@ class SDDExplicitManager(SDDManager):
     clean_nodes(self, root_inode).
     """
 
-    def __init__(self, varcount=0, auto_gc=False, var_constraint=None):
+    def __init__(self, varcount=0, auto_gc=False, var_constraint=None, x_node=None):
         """Create a new SDDExplicitManager.
 
         :param varcount: number of initial variables
@@ -161,6 +165,7 @@ class SDDExplicitManager(SDDManager):
         SDDManager.__init__(
             self, varcount=varcount, auto_gc=auto_gc, var_constraint=var_constraint
         )
+        self._x_node = None
 
     @staticmethod
     def create_from_SDDManager(sddmgr):
@@ -168,6 +173,166 @@ class SDDExplicitManager(SDDManager):
         vars(new_mgr).update(vars(sddmgr))
         return new_mgr
 
+    def get_vtree_vars(self, vtree):
+        # optimize by calling once
+        if vtree.is_leaf():
+            return [vtree.var()]
+        else:
+            vars = []
+            if vtree.left() is not None:
+                vars += self.get_vtree_vars(vtree.left())
+            if vtree.right() is not None:
+                vars += self.get_vtree_vars(vtree.right())
+            return vars
+
+    def get_x_node(self):
+        if self._x_node is None:
+            vtree = self.get_manager().vtree()
+            return self._get_x_node(vtree)
+        else:
+            return self._x_node
+    
+    def _get_x_node(self, vtree):
+        if vtree is None:
+            return None
+        else:
+            if vtree.left() is not None:
+                vleft = set(self.get_vtree_vars(vtree.left()))
+            else:
+                vleft = set()
+            if vtree.right() is not None:
+                vright = set(self.get_vtree_vars(vtree.right()))
+            else:
+                vright = set()
+            x_constrained = {i for i in range(0,len(self.x_constraint)) if self.x_constraint[i]}
+            vars_in_x = x_constrained & vleft.union(vright)
+            if len(vars_in_x) == 0:
+                self._x_node = vtree.position()
+            else:
+                self._get_x_node(vtree.right())
+            return self._x_node
+
+    def _get_wmc_func(self, weights, semiring, perform_smoothing=True, normalize=True):
+        """
+        Get the function used to perform weighted model counting with the SddIterator. Smoothing supported.
+
+        :param weights: The weights used during computations.
+        :type weights: dict[int, tuple[Any, Any]]
+        :param semiring: The semiring used for the operations.
+        :param perform_smoothing: Whether smoothing must be performed. If false but semiring.is_nsp() then
+            smoothing is still performed.
+        :return: A WMC function that uses the semiring operations and weights, Performs smoothing if needed.
+        """
+
+        smooth_flag = perform_smoothing or semiring.is_nsp()
+
+        def func_weightedmodelcounting(
+            node, rvalues, expected_prime_vars, expected_sub_vars
+        ):
+            """ Method to pass on to SddIterator's ``depth_first`` to perform weighted model counting."""
+            if rvalues is None:
+                # Leaf
+                if node.is_true():
+                    result_weight = semiring.one()
+
+                    # If smoothing, go over literals missed in scope
+                    if smooth_flag:
+                        missing_literals = (
+                            expected_prime_vars
+                            if expected_prime_vars is not None
+                            else set()
+                        )
+                        missing_literals |= (
+                            expected_sub_vars
+                            if expected_sub_vars is not None
+                            else set()
+                        )
+
+                        for missing_literal in missing_literals:
+                            missing_pos_weight, missing_neg_weight = weights[
+                                missing_literal
+                            ]
+                            missing_combined_weight = semiring.plus(
+                                missing_pos_weight, missing_neg_weight
+                            )
+                            result_weight = semiring.times(
+                                result_weight, missing_combined_weight
+                            )
+
+                    return result_weight
+
+                elif node.is_false():
+                    return semiring.zero()
+
+                elif node.is_literal():
+                    p_weight, n_weight = weights.get(abs(node.literal))
+                    result_weight = p_weight if node.literal >= 0 else n_weight
+
+                    # If smoothing, go over literals missed in scope
+                    if smooth_flag:
+                        lit_scope = {abs(node.literal)}
+
+                        if expected_prime_vars is not None:
+                            missing_literals = expected_prime_vars.difference(lit_scope)
+                        else:
+                            missing_literals = set()
+                        if expected_sub_vars is not None:
+                            missing_literals |= expected_sub_vars.difference(lit_scope)
+
+                        for missing_literal in missing_literals:
+                            missing_pos_weight, missing_neg_weight = weights[
+                                missing_literal
+                            ]
+                            missing_combined_weight = semiring.plus(
+                                missing_pos_weight, missing_neg_weight
+                            )
+                            result_weight = semiring.times(
+                                result_weight, missing_combined_weight
+                            )
+
+                    return result_weight
+
+                else:
+                    raise Exception("Unknown leaf type for node {}".format(node))
+            else:
+                # Decision node
+                if node is not None and not node.is_decision():
+                    raise Exception("Expected a decision node for node {}".format(node))
+
+                normalization = semiring.one()
+                if node.vtree().position() == self.get_x_node():
+                    mc_decision =  node.model_count()
+                    normalization = semiring.value(1/mc_decision)
+                
+                result_weight = None
+                for prime_weight, sub_weight, prime_vars, sub_vars in rvalues:
+                    branch_weight = semiring.times(prime_weight, sub_weight)
+
+                    # If smoothing, go over literals missed in scope
+                    if smooth_flag:
+                        missing_literals = expected_prime_vars.difference(
+                            prime_vars
+                        ) | expected_sub_vars.difference(sub_vars)
+                        for missing_literal in missing_literals:
+                            missing_pos_weight, missing_neg_weight = weights[
+                                missing_literal
+                            ]
+                            missing_combined_weight = semiring.plus(
+                                missing_pos_weight, missing_neg_weight
+                            )
+                            branch_weight = semiring.times(
+                                branch_weight, missing_combined_weight
+                            )
+
+                    # Add to current intermediate result
+                    if result_weight is not None:
+                        result_weight = semiring.plus(result_weight, branch_weight)
+                    else:
+                        result_weight = branch_weight
+
+                return semiring.times(result_weight, normalization)
+
+        return func_weightedmodelcounting
     # Error: wrong refcounts. parent.deref() = all descendents.deref()
     # def clean_nodes(self, root_inode):
     #    """
@@ -198,7 +363,7 @@ class SDDExplicitEvaluator(SDDEvaluator):
             self._evidence_weight = self._evaluate_root()
             if self.semiring.is_zero(self._evidence_weight):
                 raise InconsistentEvidenceError(context=" during compilation")
-        print("Ev weight", self._evidence_weight)
+        # print("Ev weight", self._evidence_weight)
         return self._evidence_weight
 
     def evaluate_fact(self, node):
@@ -208,7 +373,7 @@ class SDDExplicitEvaluator(SDDEvaluator):
         return self.evaluate(self, node)
 
     def evaluate(self, node, normalize=True):
-        print("evaluating ", node, self._evidence_weight)
+        # print("evaluating ", node, self._evidence_weight)
         # Trivial case: node is deterministically True or False
         if node == self.formula.TRUE:
             if not self.semiring.is_nsp():
@@ -230,19 +395,18 @@ class SDDExplicitEvaluator(SDDEvaluator):
             #     self._set_value(c.node, (c.node > 0))
 
             # Calculate result
-            print("weights: %s" % self.weights)
             result = self._evaluate_root()
 
             # Restore query weight
             self.set_weight(index, p_orig, n_orig)
 
-            print("result: %s" % result)
-            print("normalization: %s" % self._get_z())
-            print("normalizing %s with %s and result before %s" % (normalize, self._get_z(), result))
+            # print("result: %s" % result)
+            # print("normalization: %s" % self._get_z())
+            # print("normalizing %s with %s and result before %s" % (normalize, self._get_z(), result))
             if normalize:
                 result = self.semiring.normalize(result, self._get_z())
-            print("normalized result: %s" % result)
-            print("----------------------------------------")
+            # print("normalized result: %s" % result)
+            # print("----------------------------------------")
 
         return self.semiring.result(result, self.formula)
 
@@ -300,8 +464,8 @@ def build_explicit_from_logicdag(source, destination, **kwdargs):
     :rtype: SDDExplicit
     """
 
-    print(source)
-    print("---")
+    # print(source)
+    # print("---")
 
     # Get init varcount
     init_varcount = kwdargs.get("init_varcount", -1)
@@ -313,6 +477,8 @@ def build_explicit_from_logicdag(source, destination, **kwdargs):
             if type(clause.probability) != bool:
                 vcn.append(clause.name)
     var_constraint_named =  x_constrained_named(vcn)
+
+    # print("--->",var_constraint_named)
 
     if var_constraint_named is not None and isinstance(
         var_constraint_named, x_constrained_named
@@ -471,10 +637,11 @@ def build_explicit_from_logicdag(source, destination, **kwdargs):
             destination.add_cycle_constraint(c.copy(rename))
 
         destination.build_dd(root_key)
+        # print(destination.var_constraint)
         # destination.cleanup_inodes()
-        print(destination)
-        print(node_to_indicator)
-        print(destination.labeled())
+        # print(destination)
+        # print(node_to_indicator)
+        # print(destination.labeled())
     return destination
 
 

@@ -682,18 +682,18 @@ def build_dd(source, destination, **kwdargs):
         for c in source.cycle_constraints():
             destination.add_cycle_constraint(c.copy(translate))
 
-        destination.lnm = {'true':'T', 'false':'F', 'mult': '∧', 'add' : '∨' }
-        for v in destination.var2atom:
-            name = str(destination.get_name(destination.var2atom[v]))
-            n = name.replace('algebraic_atom((0, 0, 0),set(none),ap,"0.4")', "ap")
-            n = n.replace('algebraic_atom((1, 0, 0),set(none),bp,"0.6")', "bp")
-            n = n.replace("problog_cv_b_2_4", "cvb")
-            n = n.replace("problog_cv_a_2_4", "cva")
-            n = n.replace("problog_cv_b_4_3", "cvb")
-            n = n.replace("problog_cv_a_4_3", "cva")
-            destination.lnm[v] = n
-            destination.lnm[-v] = f"¬{n}"
-        destination.get_manager().litnamemap = destination.lnm
+        # destination.lnm = {'true':'T', 'false':'F', 'mult': '∧', 'add' : '∨' }
+        # for v in destination.var2atom:
+        #     name = str(destination.get_name(destination.var2atom[v]))
+        #     n = name.replace('algebraic_atom((0, 0, 0),set(none),ap,"0.4")', "ap")
+        #     n = n.replace('algebraic_atom((1, 0, 0),set(none),bp,"0.6")', "bp")
+        #     n = n.replace("problog_cv_b_2_4", "cvb")
+        #     n = n.replace("problog_cv_a_2_4", "cva")
+        #     n = n.replace("problog_cv_b_4_3", "cvb")
+        #     n = n.replace("problog_cv_a_4_3", "cva")
+        #     destination.lnm[v] = n
+        #     destination.lnm[-v] = f"¬{n}"
+        # destination.get_manager().litnamemap = destination.lnm
         # destination.lnm[1] = "bp"
         # destination.lnm[2] = "ap"
         # destination.lnm[-1] = "¬bp"

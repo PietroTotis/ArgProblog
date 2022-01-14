@@ -4,29 +4,20 @@ import sys
 import os
 import platform
 sys.path.append(os.path.join(os.path.dirname(__file__), 'aspmc'))
-from problog.evaluator import SemiringProbability
-
-from .sdd_formula import SDDManager, SDD, build_sdd
-from .cycles import break_cycles
 
 from .util import subprocess_check_output, mktempfile, Timer
 from logging import getLogger, log
-from .logic import AnnotatedDisjunction, term2str, Term, Clause, Or, Constant, And, Not, Var
+from .logic import AnnotatedDisjunction, Term, Clause, Or, Constant, And, Not, Var
 from collections import defaultdict, deque
 from subprocess import CalledProcessError
-from .errors import GroundingError
-from .engine import UnknownClause
-from .program import SimpleProgram, PrologString, PrologFile
-from .formula import LogicGraph, LogicDAG
+from .program import SimpleProgram, PrologString
+from .formula import LogicGraph
 from .cnf_formula import CNF_ASP
 from .constraint import ConstraintAD
 from .clausedb import ClauseDB
 from .aspmc.aspmc.programs.smprogram import SMProblogProgram
 from .aspmc.aspmc.compile import constrained_compile as concom
 from .aspmc.aspmc.compile import vtree as vtree
-from .ddnnf_formula import _load_nnf
-from problog import program
-
 # add exception for unsupported elements of the language (lists, imports...)
 
 def aspmc(program_str):
@@ -78,9 +69,9 @@ def ground_to_cb_graph(model, target=None, queries=[], evidence=[], propagate_ev
                labels, engine, debug, **kwdargs ) 
     smodels_broken = SmodelsParser(broken2smodels, target=target, queries=queries, evidence=evidence)
     lg = smodels_broken.smodels2internal()
-    print(lg)
-    print("------")
-    lg.vtree = v3
+    # print(lg)
+    # print("------")
+    # lg.vtree = v3
     # lg.defined = cnf.get_defined()
     # lg.cnf_file = cnf_file
     return lg
@@ -397,7 +388,7 @@ class SmodelsParser:
             return logic_graph.FALSE
         if a in self.heads:
             id = logic_graph.get_node_by_name(name)
-            label = Term(term2str(name)+"_fact")
+            label = Term(name.functor+"_fact", *name.args)
             atom_id = logic_graph.add_atom(name, a.probability, name=label)
             logic_graph.add_disjunct(id, atom_id)
             return atom_id
@@ -800,21 +791,36 @@ class SmodelsParser:
 
     def smodels2problog(self, **kwdargs):
         program_string = self.smodels2internal().to_prolog()
-        return PrologString(program_string)
-        #fixme
-        # gp = SimpleProgram(**kwdargs)
-        # for f in self.facts:
-        #     for pf in self.facts[f]:
-        #         gp.add_fact(pf)
-        # for e in self.evidence:
-        #     gp.add_statement(self.evidence[e])
-        # for ad in self.annotated_disjunctions_with_prob:
-        #     gp.add_statement(ad)
-        # for head in self.base_rules:
-        #     # if not self.names[head].startswith("aux"):
-        #     for r in self.base_rules[head]: 
-        #         gp.add_clause(r)
-        # for q in self.queries:
-        #     gp.add_statement(self.queries[q])
-        # return gp
+        # remove gringo_aux
+        program = PrologString(program_string)
+        gaux = {}
+        for s in program:
+            if isinstance(s, Term) and s.functor.startswith("gringo_aux"):
+                gaux[s] = s.probability
+        clean_program = SimpleProgram()
+        for s in program:
+            if isinstance(s, Clause):
+                new_head = s.head
+                if isinstance(s.body, And):
+                    body = []
+                    for b in s.body.to_list():
+                        if b.functor.startswith("gringo_aux"):
+                            p = gaux[b]
+                            new_head = s.head.with_probability(p)
+                        else:
+                            body.append(b)
+                    clause = Clause(new_head, And.from_list(body))
+                else:
+                    if s.body.functor.startswith("gringo_aux"):
+                        p = gaux[s.body]
+                        new_head= s.head.with_probability(p)
+                        clause = new_head
+                    else:
+                        clause = Clause(new_head, s.body)
 
+                clean_program.add_clause(clause)
+            elif isinstance(s, Term) and not s.functor.startswith("gringo_aux"):
+                clean_program.add_fact(s)
+            else:
+                pass
+        return clean_program

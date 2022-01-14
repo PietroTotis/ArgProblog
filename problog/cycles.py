@@ -198,8 +198,8 @@ def break_neg_cycles(source, target, translation=None, **kwdargs):
     :return: target
     """
     logger = logging.getLogger("problog")
-    print(source.to_prolog())
-    print("*********")
+    # print(source.to_prolog())
+    # print("*********")
     target.vtree = source.vtree
     with Timer("Cycle breaking"):
         # cycles_broken = {k:[] for k in range(1,len(source))}
@@ -213,8 +213,8 @@ def break_neg_cycles(source, target, translation=None, **kwdargs):
             )
             content |= visited
             target.add_name(q, newnode, l)
-        print(target.to_prolog())
-        print(target)
+        # print(target.to_prolog())
+        # print(target)
         return target
 
 def _break_neg_cycles(
@@ -246,6 +246,10 @@ def _break_neg_cycles(
         # print("cycle", nodeid, ancestors, cycle)
         newname1 = source.get_node(ancestors[-1]).name
         newname2 = node.name
+        if newname1 is None:
+            newname1 = Term(str(ancestors[-1]))
+        if newname2 is None:
+            newname1 = Term(str(nodeid))
         newfunc1 = cycle_var_prefix + newname1.functor + "_" + cycle
         newfunc2 = cycle_var_prefix + newname2.functor + "_" + cycle
         newname1 = Term(newfunc1, *newname1.args)
@@ -263,7 +267,7 @@ def _break_neg_cycles(
         # nodeid: depending how long the cycle is, we remember that when we get back to nodeid in the recursion
         #         we have to add the constraint between its cb variable (newnode2) and the new id in target
         cycle_info = [(ancestors[-1], ancestors[-2], newnode1, newnode2, nodeid)]
-        print(cycle_info)
+        # print(cycle_info)
         return newnode2, cycle_info, content
     else:
         broken_cycles = []
