@@ -391,6 +391,10 @@ def clarks_completion(source, destination, force_atoms=False, **kwdargs):
         for c in source.constraints():
             destination.add_constraint(c)
 
+        # Copy cycle constraints.
+        for c in source.cycle_constraints():
+            destination.add_constraint(c)
+
         # Copy node names.
         for n, i, l in source.get_names_with_label():
             destination.add_name(n, i, l)

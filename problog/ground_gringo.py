@@ -16,21 +16,21 @@ from .cnf_formula import CNF_ASP
 from .constraint import ConstraintAD
 from .clausedb import ClauseDB
 from .aspmc.aspmc.programs.smprogram import SMProblogProgram
-from .aspmc.aspmc.compile import constrained_compile as concom
+# from .aspmc.aspmc.compile import constrained_compile as concom
 from .aspmc.aspmc.compile import vtree as vtree
 # add exception for unsupported elements of the language (lists, imports...)
 
-def aspmc(program_str):
+def aspmc_lp(program_str):
 
     program = SMProblogProgram(program_str, [])
     program.tpUnfold()
-    program.td_guided_both_clark_completion()
+    # program.td_guided_both_clark_completion()
     lp = program._prog_string(program._program)
-    cnf = program.get_cnf()
+    # cnf = program.get_cnf()
     # results, file = cnf.compile()
     # print(file)
     # print(_load_nnf(file, CNF_ASP()).to_dot())
-    return cnf, lp
+    return lp
 
 
 def ground_to_graph(model, target=None, queries=[], evidence=[], propagate_evidence=False,
@@ -57,8 +57,8 @@ def ground_to_cb_graph(model, target=None, queries=[], evidence=[], propagate_ev
     ground_program = smodels.smodels2problog()
     # for s in ground_program:
     #     print(s)
-    cnf, lp_string = aspmc(ground_program.to_prolog())
-    (_, v3) = concom.tree_from_cnf(cnf, tree_type=vtree.Vtree)
+    lp_string = aspmc_lp(ground_program.to_prolog())
+    # (_, v3) = concom.tree_from_cnf(cnf, tree_type=vtree.Vtree)
     # print(lp_string)
 
     queries_tuples = [q.args for q in ground_program if q.is_query()]

@@ -23,10 +23,7 @@ Interface to Sentential Decision Diagrams (SDD) using the explicit encoding repr
     limitations under the License.
 """
 from __future__ import print_function
-import sys
-import os
 from collections import namedtuple
-sys.path.append(os.path.join(os.path.dirname(__file__), 'aspmc'))
 
 from .formula import LogicDAG, LogicFormula
 from .core import transform
@@ -152,7 +149,7 @@ class SDDExplicitManager(SDDManager):
     clean_nodes(self, root_inode).
     """
 
-    def __init__(self, varcount=0, auto_gc=False, var_constraint=None, x_node=None):
+    def __init__(self, varcount=0, auto_gc=False, var_constraint=None, vtree=None):
         """Create a new SDDExplicitManager.
 
         :param varcount: number of initial variables
@@ -163,7 +160,7 @@ class SDDExplicitManager(SDDManager):
         :type var_constraint: x_constrained
         """
         SDDManager.__init__(
-            self, varcount=varcount, auto_gc=auto_gc, var_constraint=var_constraint
+            self, varcount=varcount, auto_gc=auto_gc, var_constraint=var_constraint, vtree=vtree
         )
         self._x_node = None
 
@@ -478,8 +475,6 @@ def build_explicit_from_logicdag(source, destination, **kwdargs):
                 vcn.append(clause.name)
     var_constraint_named =  x_constrained_named(vcn)
 
-    # print("--->",var_constraint_named)
-
     if var_constraint_named is not None and isinstance(
         var_constraint_named, x_constrained_named
     ):
@@ -637,11 +632,7 @@ def build_explicit_from_logicdag(source, destination, **kwdargs):
             destination.add_cycle_constraint(c.copy(rename))
 
         destination.build_dd(root_key)
-        # print(destination.var_constraint)
-        # destination.cleanup_inodes()
-        # print(destination)
-        # print(node_to_indicator)
-        # print(destination.labeled())
+
     return destination
 
 
