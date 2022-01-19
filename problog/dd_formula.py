@@ -67,6 +67,7 @@ class DD(LogicGraph, EvaluatableDSP):
         var = self.get_manager().add_variable()
         self.atom2var[index] = var
         self.var2atom[var] = index
+        # print(self.atom2var, self.get_manager().get_manager().var_count())
         return atom(identifier, probability, group, name, source)
 
     def get_inode(self, index):
@@ -651,7 +652,7 @@ def build_dd(source, destination, **kwdargs):
     :param kwdargs: extra arguments
     :return: destination
     """
-    print(source)
+    # print(source)
     with Timer("Compiling %s" % destination.__class__.__name__):
 
         translate = {}
