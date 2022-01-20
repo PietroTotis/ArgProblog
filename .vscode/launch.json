@@ -11,11 +11,12 @@
             "request": "launch",
             "program": "problog-cli.py",
             "console": "integratedTerminal",
+            "args" : ["-k", "ddnnf", "/media/windows/Users/pietr/Desktop/PhD/Experiments/CC/benchmarks/smproblog/smokers/try.pl"]
             // "args" : ["--nologspace", "-k", "sddx", "/media/windows/Users/pietr/Desktop/PhD/Experiments/smproblog/smokers/smokers_neg/1/1.pl"]
             // "args" : ["--nologspace","-k", "sddx","/media/windows/Users/pietr/Desktop/PhD/Problogs/ASP-Problog/test/simple_neg_cycle/neg_head/neg_heads.pl"]
             // "args" : ["--nologspace","-k", "sddx","/media/windows/Users/pietr/Desktop/PhD/Problogs/ASP-Problog/test/args.pl"]
             // "args" : ["--nologspace","-k", "ddnnf","/media/windows/Users/pietr/Desktop/PhD/Problogs/ASP-Problog/test/args.pl"]
-            "args" : ["--nologspace","-k", "sddx", "/media/windows/Users/pietr/Desktop/PhD/Problogs/ASP-Problog/test/simple_neg_cycle/neg/neg.pl"]
+            // "args" : ["--nologspace","-k", "sddx", "/media/windows/Users/pietr/Desktop/PhD/Problogs/ASP-Problog/test/simple_neg_cycle/neg/neg.pl"]
             // "args" : ["ground", "/media/windows/Users/pietr/Desktop/PhD/Experiments/smproblog/smokers/smokers_neg/1/1.pl"]
             // "args" : ["--nologspace", "-k", "ddnnf", "--pasp",  "/media/windows/Users/pietr/Desktop/PhD/Experiments/smproblog/smokers/smokers_neg/4/4.pl"]
             // "args" : ["--nologspace", "-k", "ddnnf", "--pasp", "/media/windows/Users/pietr/Desktop/PhD/Problogs/ASP-Problog/test/simple_neg_cycle/neg/neg.pl"]
