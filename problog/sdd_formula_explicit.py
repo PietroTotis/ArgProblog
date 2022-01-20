@@ -185,29 +185,25 @@ class SDDExplicitManager(SDDManager):
     def get_x_node(self):
         if self._x_node is None:
             vtree = self.get_manager().vtree()
-            return self._get_x_node(vtree)
-        else:
-            return self._x_node
-    
-    def _get_x_node(self, vtree):
-        if vtree is None:
-            return None
-        else:
-            if vtree.left() is not None:
-                vleft = set(self.get_vtree_vars(vtree.left()))
-            else:
-                vleft = set()
-            if vtree.right() is not None:
-                vright = set(self.get_vtree_vars(vtree.right()))
-            else:
-                vright = set()
             x_constrained = {i for i in range(0,len(self.x_constraint)) if self.x_constraint[i]}
-            vars_in_x = x_constrained & vleft.union(vright)
-            if len(vars_in_x) == 0:
-                self._x_node = vtree.position()
+            x_node, _ = self._get_x_node(vtree, x_constrained)
+            self._x_node = x_node
+        return self._x_node
+
+    def _get_x_node(self, vtree, x_constrained):
+        vpos = vtree.position()
+        vvar = vtree.var()
+        if vtree.right() is not None:
+            r_pos, rvars = self._get_x_node(vtree.right(), x_constrained)
+            lvars = set(self.get_vtree_vars(vtree.left()))
+            vars = lvars.union(rvars)
+            vars_in_x = x_constrained & vars
+            if len(vars_in_x) != 0:
+                return r_pos, vars
             else:
-                self._get_x_node(vtree.right())
-            return self._x_node
+                return vpos, {vvar}
+        else:
+            return vtree.position(), {vtree.var()}
 
     def _get_wmc_func(self, weights, semiring, perform_smoothing=True, normalize=True):
         """
@@ -300,6 +296,7 @@ class SDDExplicitManager(SDDManager):
                 if node.vtree().position() == self.get_x_node():
                     mc_decision =  node.model_count()
                     normalization = semiring.value(1/mc_decision)
+                    # print(node, node.vtree().position(), mc_decision)
                 
                 result_weight = None
                 for prime_weight, sub_weight, prime_vars, sub_vars in rvalues:
@@ -330,19 +327,6 @@ class SDDExplicitManager(SDDManager):
                 return semiring.times(result_weight, normalization)
 
         return func_weightedmodelcounting
-    # Error: wrong refcounts. parent.deref() = all descendents.deref()
-    # def clean_nodes(self, root_inode):
-    #    """
-    #    Cleans up all references except root_inode's. This means all other nodes will be dereferenced.
-    #    ! Beware, after calling this self.nodes will be empty, do not use it afterwards !
-    #    :param root_inode: The node not to dereference.
-    #    :type root_inode: SddNode
-    #    """
-    #    for node in self.nodes:
-    #        if node is not None and node.id != root_inode.id:
-    #            while node.ref_count() > 0:
-    #                node.deref()
-    #    self.nodes = []
 
 
 class SDDExplicitEvaluator(SDDEvaluator):

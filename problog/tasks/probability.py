@@ -136,7 +136,6 @@ def execute(
             else:
                 profiler = None
 
-            # if kwdargs['sm']:
             kwdargs.update({'keep_all':True, 'avoid_name_clash':True})
 
             engine = DefaultEngine(**kwdargs)
@@ -225,7 +224,7 @@ def argparser():
         "-k",
         dest="koption",
         choices=get_evaluatables(),
-        default=None,
+        default="sddxd",
         help="Knowledge compilation tool.",
     )
     parser.add_argument(
@@ -235,18 +234,18 @@ def argparser():
 
     # Evaluation semiring
     ls_group = parser.add_mutually_exclusive_group()
-    ls_group.add_argument(
-        "--logspace",
-        action="store_true",
-        help="Use log space evaluation (default).",
-        default=True,
-    )
-    ls_group.add_argument(
-        "--nologspace",
-        dest="logspace",
-        action="store_false",
-        help="Use normal space evaluation.",
-    )
+    # ls_group.add_argument(
+    #     "--logspace",
+    #     action="store_true",
+    #     help="Use log space evaluation (default).",
+    #     default=True,
+    # )
+    # ls_group.add_argument(
+    #     "--nologspace",
+    #     dest="logspace",
+    #     action="store_false",
+    #     help="Use normal space evaluation.",
+    # )
     ls_group.add_argument(
         "--symbolic",
         dest="symbolic",
@@ -256,12 +255,6 @@ def argparser():
 
     parser.add_argument(
         "--output", "-o", help="Output file (default stdout)", type=OutputFile
-    )
-    parser.add_argument(
-        "--pasp",
-        action="store_true",
-        help="Use probabilistic ASP semantics (default: False).",
-        default=False,
     )
     parser.add_argument(
         "--recursion-limit",
@@ -342,8 +335,6 @@ def argparser():
         help=argparse.SUPPRESS,
     )
 
-    # parser.add_argument('--sm', action='store_true', help='use stable models semantics')
-
     # SDD garbage collection
     sdd_auto_gc_group = parser.add_mutually_exclusive_group()
     sdd_auto_gc_group.add_argument(
@@ -418,10 +409,12 @@ def main(argv, result_handler=None):
             parser.print_help()
             sys.exit(1)
 
-    if args.logspace:
-        semiring = SemiringLogProbability()
-    else:
-        semiring = SemiringProbability()
+    # if args.logspace:
+    #     semiring = SemiringLogProbability()
+    # else:
+    #     semiring = SemiringProbability()
+
+    semiring = SemiringProbability()
 
     if args.symbolic:
         args.koption = "nnf"

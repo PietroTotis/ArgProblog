@@ -256,9 +256,11 @@ class SDDManager(DDManager):
         self.litnamemap = litnamemap
         if var_constraint is not None and varcount > 1:
             self.x_constraint = self._to_x_constrained_list(varcount, var_constraint)
-            vtree = Vtree.new_with_X_constrained(
-                var_count=varcount, is_X_var=self.x_constraint, vtree_type="balanced"
-            )
+            if vtree is None:
+                vtree = Vtree.new_with_X_constrained(
+                    var_count=varcount, is_X_var=self.x_constraint, vtree_type="balanced"
+                )
+
         self.__manager = sdd.SddManager(
             var_count=varcount, auto_gc_and_minimize=auto_gc, vtree=vtree
         )

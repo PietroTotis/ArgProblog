@@ -79,11 +79,9 @@ class SimpleDDNNFEvaluator(Evaluator):
         self.models = []
         self.multi_sm = {}
         self.valid_choices = set()
-        self.pasp = kwargs["pasp"]
         # print(formula.to_dot())
 
-        if not self.pasp:
-            self.multi_stable_models()
+        self.multi_stable_models()
 
     def _initialize(self, with_evidence=True):
         self.weights.clear()
@@ -165,8 +163,8 @@ class SimpleDDNNFEvaluator(Evaluator):
             # if not abs(node) in self.evidence():
             # if not self.has_evidence():
             result = self.correct_weight(result, node)
-            if self.has_evidence() or self.semiring.is_nsp() or self.pasp:
-                result = self.semiring.normalize(result, self._get_z())
+            # if self.has_evidence() or self.semiring.is_nsp() or self.pasp:
+            result = self.semiring.normalize(result, self._get_z())
             result = self.semiring.result(result, self.formula)
         return result
         
@@ -206,8 +204,6 @@ class SimpleDDNNFEvaluator(Evaluator):
         return w
     
     def query(self, index):
-        if self.pasp:
-            return self.evaluate(index)
         if len(list(self.evidence()))==0:
             root_weight = self._get_z()
             inconsistent_weight = self.semiring.negate(root_weight)
@@ -531,7 +527,7 @@ class SimpleDDNNFEvaluator(Evaluator):
     #         else:
     #             raise TypeError("Unexpected node type: '%s'." % ntype)
 
-    # Aggregate later with numpy
+    # Aggregate later
     def get_worlds(self, key):
         if key == 0 or key is None:
             return ((),)
@@ -626,9 +622,8 @@ class SimpleDDNNFEvaluator(Evaluator):
         self.labelled = [id for _, id, _ in self.formula.labeled()] # logical and probabilistic atoms
         weights = self.formula.get_weights()
         self.choices = set([key for key in weights if not isinstance(weights[key], bool)])
-        print(len(self.choices),len(self.formula))
+        # print(len(self.choices),len(self.formula))
         if self.neg_cycles:
-            # print("mh")
             root = len(self.formula._nodes)
             # print(weights)
             # print(self.labelled)
@@ -637,9 +632,6 @@ class SimpleDDNNFEvaluator(Evaluator):
             start = time.time()
             self.models = self.get_worlds(root)
 
-            # n_models = len(self.models)  
-            # worlds = [w for ws in self.keyworlds.values() for w in ws]
-            # self.multi_sm = Counter(worlds)
             for model in self.models:
                 choices = frozenset([atom for atom in model if abs(atom) in self.choices])
                 self.valid_choices.add(choices)
@@ -647,7 +639,7 @@ class SimpleDDNNFEvaluator(Evaluator):
                     self.multi_sm[choices].append(model)
                 else:
                     self.multi_sm[choices] = [model]
-            # self.multi_sm = Counter([frozenset(m) for m in self.models])
+
             # if the number of models is a multiple of the total number from the counter
             # then there must be some non-probabilistic choice in each world
             # then normalize each world w.r.t. that number
@@ -656,7 +648,6 @@ class SimpleDDNNFEvaluator(Evaluator):
             # self.n_logic_choices = n_models / n_pws
 
             self.multi_sm = {k:self.multi_sm[k] for k in self.multi_sm if len(self.multi_sm[k])>1}
-            # self.multi_sm = {k: c*n_logic_choices for k, c in self.multi_sm.items() if c>1 or n_logic_choices>1}
             # print(self.keyworlds)
             end = time.time()
             print(f"Enumeration: {round(end-start,3)}s")
