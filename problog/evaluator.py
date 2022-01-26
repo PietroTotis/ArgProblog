@@ -527,7 +527,7 @@ class Evaluatable(ProbLogObject):
         :return: evaluator for this formula
         """
         if semiring is None:
-            semiring = SemiringLogProbability()
+            semiring = SemiringProbability()
 
         evaluator = self._create_evaluator(semiring, weights, **kwargs)
 
