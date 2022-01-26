@@ -167,7 +167,7 @@ def build_explicit_from_logicdag(source, destination, **kwdargs):
     var_ids = []
     for id, clause, c_type in source:
         if c_type == "atom":
-            if type(clause.probability) != bool or id in sep:
+            if type(clause.probability) != bool:
                 var_ids.append(id)
 
     destination._create_manager(

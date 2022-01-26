@@ -57,7 +57,7 @@ class DDNNF(LogicDAG, EvaluatableDSP):
     transform_preference = 20
 
     # noinspection PyUnusedLocal,PyUnusedLocal,PyUnusedLocal
-    def __init__(self, neg_cycles=None, **kwdargs):
+    def __init__(self, neg_cycles=False, **kwdargs):
         LogicDAG.__init__(self, auto_compact=False, **kwdargs)
         # self.n_models = n_models
         self.neg_cycles = neg_cycles
@@ -69,7 +69,7 @@ class DDNNF(LogicDAG, EvaluatableDSP):
 class SimpleDDNNFEvaluator(Evaluator):
     """Evaluator for d-DNNFs."""
 
-    def __init__(self, formula, semiring, weights=None, neg_cycles=None, **kwargs):
+    def __init__(self, formula, semiring, weights=None, neg_cycles=False, **kwargs):
         Evaluator.__init__(self, formula, semiring, weights, **kwargs)
         self.cache_intermediate = {}  # weights of intermediate nodes
         self.cache_models = {} # weights of models

@@ -163,6 +163,9 @@ class SDDExplicitManager(SDDManager):
             self, varcount=varcount, auto_gc=auto_gc, var_constraint=var_constraint, vtree=vtree
         )
         self._x_node = None
+        # print(self.get_manager().vtree().dot())
+        # print({i for i in range(0,len(self.x_constraint)) if self.x_constraint[i]})
+        # print(self.get_x_node())
 
     @staticmethod
     def create_from_SDDManager(sddmgr):
@@ -426,6 +429,17 @@ class SDDExplicitEvaluator(SDDEvaluator):
             neg = self.weights[index][1]
             self.set_weight(index, self.semiring.zero(), neg)
 
+    def query(self, index):
+        if len(list(self.evidence()))==0:
+            root_weight = self._get_z()
+            inconsistent_weight = self.semiring.negate(root_weight)
+            true_weight = self.evaluate(index)
+            false_weight = self.semiring.negate(self.semiring.plus(inconsistent_weight,true_weight))
+            return (true_weight, false_weight, inconsistent_weight)
+        else:
+            true_weight = self.evaluate(index)
+            false_weight = self.semiring.negate(true_weight)
+            return (true_weight, false_weight, self.semiring.zero())
 
 x_constrained_named = namedtuple(
     "x_constrained", "X_named"
