@@ -26,10 +26,13 @@ from __future__ import print_function
 import sys
 import os
 from collections import namedtuple
-sys.path.append(os.path.join(os.path.dirname(__file__), 'aspmc'))
-from .aspmc.aspmc.compile.vtree import Vtree as aspmc_Vtree
-from .aspmc.aspmc.compile.cnf import CNF as aspmc_CNF
-from .aspmc.aspmc.compile.constrained_compile import tree_from_cnf 
+# sys.path.append(os.path.join(os.path.dirname(__file__), 'aspmc'))
+# from .aspmc.aspmc.compile.vtree import Vtree as aspmc_Vtree
+# from .aspmc.aspmc.compile.cnf import CNF as aspmc_CNF
+# from .aspmc.aspmc.compile.constrained_compile import tree_from_cnf 
+from aspmc.compile.vtree import Vtree as aspmc_Vtree
+from aspmc.compile.cnf import CNF as aspmc_CNF
+from aspmc.compile.constrained_compile import tree_from_cnf 
 
 from .formula import LogicDAG, LogicFormula
 from .core import transform
