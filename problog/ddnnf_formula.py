@@ -22,6 +22,7 @@ Provides access to d-DNNF formulae.
     limitations under the License.
 """
 from __future__ import print_function
+
 # from problog.ground_gringo import check_evidence
 
 import tempfile
@@ -72,7 +73,7 @@ class SimpleDDNNFEvaluator(Evaluator):
     def __init__(self, formula, semiring, weights=None, neg_cycles=False, **kwargs):
         Evaluator.__init__(self, formula, semiring, weights, **kwargs)
         self.cache_intermediate = {}  # weights of intermediate nodes
-        self.cache_models = {} # weights of models
+        self.cache_models = {}  # weights of models
         self.neg_cycles = neg_cycles
         self.keytotal = {}
         self.keyworlds = {}
@@ -167,14 +168,14 @@ class SimpleDDNNFEvaluator(Evaluator):
             result = self.semiring.normalize(result, self._get_z())
             result = self.semiring.result(result, self.formula)
         return result
-        
+
     def check_model_evidence(self, model):
         # we overcount only the models that are compatible with evidence
         ok_ev = True
         for e in self.evidence():
             ok_ev = ok_ev and e in model
         return ok_ev
-        
+
     def correct_weight(self, w, node=None):
         """
         compute the unnormalized weight first, then for each 1:many model to which the node belongs
@@ -188,27 +189,29 @@ class SimpleDDNNFEvaluator(Evaluator):
                 for atom in pw:
                     w_at = self._get_weight(atom)
                     w_pw = self.semiring.times(w_pw, w_at)
-                n = len(self.multi_sm[pw])
-                # consider only models that are possible w.r.t. evidence (but n is w.r.t. all anyway) 
-                models = [m for m in self.multi_sm[pw] if self.check_model_evidence(m)]
-                if not self.semiring.is_zero(w_pw):
-                    for model in models:
-                        if node in model or node is None: 
-                            # print(">", node, model)
-                            extra_norm = self.semiring.value(1-1/n)
-                            extra_weight = self.semiring.times(w_pw, extra_norm)
-                            # w-extra = 1-(extra+(1-w))
-                            a = self.semiring.negate(w)
-                            b = self.semiring.plus(extra_weight,a)
-                            w = self.semiring.negate(b)
+            n = len(self.multi_sm[pw])
+            # consider only models that are possible w.r.t. evidence (but n is w.r.t. all anyway)
+            models = [m for m in self.multi_sm[pw] if self.check_model_evidence(m)]
+            if not self.semiring.is_zero(w_pw):
+                for model in models:
+                    if node in model or node is None:
+                        # print(">", node, model)
+                        extra_norm = self.semiring.value(1 - 1 / n)
+                        extra_weight = self.semiring.times(w_pw, extra_norm)
+                        # w-extra = 1-(extra+(1-w))
+                        a = self.semiring.negate(w)
+                        b = self.semiring.plus(extra_weight, a)
+                        w = self.semiring.negate(b)
         return w
-    
+
     def query(self, index):
-        if len(list(self.evidence()))==0:
+        if len(list(self.evidence())) == 0:
             root_weight = self._get_z()
             inconsistent_weight = self.semiring.negate(root_weight)
             true_weight = self.evaluate(index)
-            false_weight = self.semiring.negate(self.semiring.plus(inconsistent_weight,true_weight))
+            false_weight = self.semiring.negate(
+                self.semiring.plus(inconsistent_weight, true_weight)
+            )
             return (true_weight, false_weight, inconsistent_weight)
         else:
             true_weight = self.evaluate(index)
@@ -373,7 +376,7 @@ class SimpleDDNNFEvaluator(Evaluator):
     #         negs = self._get_weight(-index)
     #         neg = self._aggregate_weights(negs)
     #         self.set_weight(index, self.semiring.zero(), neg)
-    
+
     # # Basic
     # def _aggregate_weights(self, weights):
     #     result = self.semiring.zero()
@@ -402,7 +405,7 @@ class SimpleDDNNFEvaluator(Evaluator):
     #                 for p in childprobs:
     #                     c = self.semiring.times(c, p[0])
     #                 return [c]
-    #             else:  
+    #             else:
     #                 w_conj = list(self.wproduct(childprobs))
     #                 n_children = len(w_conj)
     #                 if key in self.keyworlds:   # if we have to normalize something
@@ -489,13 +492,13 @@ class SimpleDDNNFEvaluator(Evaluator):
     #         elif ntype == 'disj':
     #             disj = []
     #             for cws in childworlds:
-    #                 disj += [w for w in cws if self.partial_choice(w)] # just flatten or 
+    #                 disj += [w for w in cws if self.partial_choice(w)] # just flatten or
     #             # print("dws:", disj)
     #             return disj
     #         else:
     #             raise TypeError("Unexpected node type: '%s'." % ntype)
 
-    # Aggregate later     
+    # Aggregate later
     # def get_worlds(self, key):
     #     if key == 0 or key is None:
     #         return [[]]
@@ -521,7 +524,7 @@ class SimpleDDNNFEvaluator(Evaluator):
     #         elif ntype == 'disj':
     #             disj = []
     #             for cws in childworlds:
-    #                 disj += [w for w in cws] # just flatten or 
+    #                 disj += [w for w in cws] # just flatten or
     #             # print("dws:", disj)
     #             return disj
     #         else:
@@ -535,31 +538,32 @@ class SimpleDDNNFEvaluator(Evaluator):
         node = self.formula.get_node(abs(key))
         ntype = type(node).__name__
 
-        if ntype == 'atom':
-            return ((key, ), )
+        if ntype == "atom":
+            return ((key,),)
         else:
             assert key > 0
             childworlds = [self.get_worlds(c) for c in node.children]
             # print("cws:", key, childworlds)
-            if ntype == 'conj':
-                cw_conj = tuple(self.tproduct(childworlds))
-                # print("cj:", key,  len(cw_conj), [len(w) for w in cw_conj])
+            if ntype == "conj":
+                cw_conj = tuple(self.tproduct(childworlds, key))
+                # print("cj:", key, len(cw_conj), [len(w) for w in cw_conj], cw_conj)
                 return cw_conj  # this contains partial worlds
-            elif ntype == 'disj':
+            elif ntype == "disj":
                 # disj = childworlds.flatten()
                 disj = sum(childworlds, ())
+                disj = [(key,) + w for w in disj]
                 # print("dws:", disj)
                 return disj
             else:
                 raise TypeError("Unexpected node type: '%s'." % ntype)
 
-    def tproduct(self, ar_list):
+    def tproduct(self, ar_list, key):
         if not ar_list:
-            yield ()
+            yield (key,)
         else:
             for a in ar_list[0]:
-                for prod in self.tproduct(ar_list[1:]):
-                    yield a+prod
+                for prod in self.tproduct(ar_list[1:], key):
+                    yield a + prod
 
     def product(self, ar_list):
         if not ar_list:
@@ -567,8 +571,8 @@ class SimpleDDNNFEvaluator(Evaluator):
         else:
             for a in ar_list[0]:
                 for prod in self.product(ar_list[1:]):
-                    yield a+prod
-    
+                    yield [a] + prod
+
     def wproduct(self, ar_list):
         if not ar_list:
             yield self.semiring.one()
@@ -577,7 +581,7 @@ class SimpleDDNNFEvaluator(Evaluator):
                 for prod in self.wproduct(ar_list[1:]):
                     yield self.semiring.times(w, prod)
 
-    def subset_diff(self,a,b):
+    def subset_diff(self, a, b):
         return a.issubset(b) and a != b
 
     def chosen(self, world):
@@ -605,8 +609,8 @@ class SimpleDDNNFEvaluator(Evaluator):
     #     # print(self.labelled)
     #     # print(self.choices)
 
-    #     ws = self.get_worlds(root)  
-    #     n_models = len(ws)  
+    #     ws = self.get_worlds(root)
+    #     n_models = len(ws)
     #     worlds = [w for ws in self.keyworlds.values() for w in ws]
     #     print(worlds)
     #     self.multi_sm = Counter(worlds)
@@ -619,9 +623,13 @@ class SimpleDDNNFEvaluator(Evaluator):
     #     self.multi_sm = {k: c*n_logic_choices for k, c in self.multi_sm.items() if c>1 or n_logic_choices>1}
 
     def multi_stable_models(self):
-        self.labelled = [id for _, id, _ in self.formula.labeled()] # logical and probabilistic atoms
+        self.labelled = [
+            id for _, id, _ in self.formula.labeled()
+        ]  # logical and probabilistic atoms
         weights = self.formula.get_weights()
-        self.choices = set([key for key in weights if not isinstance(weights[key], bool)])
+        self.choices = set(
+            [key for key in weights if not isinstance(weights[key], bool)]
+        )
         # print(len(self.choices),len(self.formula))
         if self.neg_cycles:
             root = len(self.formula._nodes)
@@ -633,7 +641,9 @@ class SimpleDDNNFEvaluator(Evaluator):
             self.models = self.get_worlds(root)
 
             for model in self.models:
-                choices = frozenset([atom for atom in model if abs(atom) in self.choices])
+                choices = frozenset(
+                    [atom for atom in model if abs(atom) in self.choices]
+                )
                 self.valid_choices.add(choices)
                 if choices in self.multi_sm:
                     self.multi_sm[choices].append(model)
@@ -647,11 +657,13 @@ class SimpleDDNNFEvaluator(Evaluator):
             # n_pws = len(self.multi_sm)
             # self.n_logic_choices = n_models / n_pws
 
-            self.multi_sm = {k:self.multi_sm[k] for k in self.multi_sm if len(self.multi_sm[k])>1}
+            self.multi_sm = {
+                k: self.multi_sm[k] for k in self.multi_sm if len(self.multi_sm[k]) > 1
+            }
             # print(self.keyworlds)
             end = time.time()
             print(f"Enumeration: {round(end-start,3)}s")
-            # print(self.multi_sm.values())
+
 
 class Compiler(object):
     """Interface to CNF to d-DNNF compiler tool."""
@@ -690,7 +702,7 @@ class Compiler(object):
 
 # if system_info.get("c2d", False):
 
-    # noinspection PyUnusedLocal
+# noinspection PyUnusedLocal
 # @transform(CNF_ASP, DDNNF)
 # def _compile_with_c2d(cnf, nnf=None, smooth=True, **kwdargs):
 #     fd, cnf_file = tempfile.mkstemp(".cnf")
@@ -756,18 +768,27 @@ class Compiler(object):
 @transform(CNF_ASP, DDNNF)
 def _compile_with_dsharp_asp(cnf, nnf=None, smooth=True, **kwdargs):
     result = None
-    with Timer('DSharp compilation'):
-        fd1, cnf_file = tempfile.mkstemp('.cnf')
-        fd2, nnf_file = tempfile.mkstemp('.nnf')
+    with Timer("DSharp compilation"):
+        fd1, cnf_file = tempfile.mkstemp(".cnf")
+        fd2, nnf_file = tempfile.mkstemp(".nnf")
         os.close(fd1)
         os.close(fd2)
         if smooth:
-            smoothl = '-smoothNNF'
+            smoothl = "-smoothNNF"
         else:
-            smoothl = ''
+            smoothl = ""
         # cmd = ['dsharp_with_unfounded', '-noIBCP', '-evidencePropagated', '-noPP', '-Fnnf', nnf_file, smoothl, '-disableAllLits', cnf_file]
         # cmd = ['dsharp_with_unfounded', '-noIBCP', '-noPP', '-Fnnf', nnf_file, smoothl, '-disableAllLits', cnf_file]
-        cmd = ['dsharp_with_unfounded', '-noIBCP', '-noPP', '-Fnnf', nnf_file, '-smoothNNF', '-disableAllLits', cnf_file]
+        cmd = [
+            "dsharp_with_unfounded",
+            "-noIBCP",
+            "-noPP",
+            "-Fnnf",
+            nnf_file,
+            "-smoothNNF",
+            "-disableAllLits",
+            cnf_file,
+        ]
 
         try:
             result = _compile(cnf, cmd, cnf_file, nnf_file)
@@ -785,7 +806,8 @@ def _compile_with_dsharp_asp(cnf, nnf=None, smooth=True, **kwdargs):
 
     return result
 
-Compiler.add('dsharp_asp', _compile_with_dsharp_asp)
+
+Compiler.add("dsharp_asp", _compile_with_dsharp_asp)
 
 
 def _compile(cnf, cmd, cnf_file, nnf_file):

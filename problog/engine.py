@@ -21,36 +21,23 @@ Grounding engine to transform a ProbLog program into a propositional formula.
     See the License for the specific language governing permissions and
     limitations under the License.
 """
-from __future__ import print_function
-
 import logging
-
+import platform
+import os
 from collections import defaultdict
-
-from .program import LogicProgram
-from .logic import *
-from .formula import LogicFormula, LogicGraph, LogicDAG
-from .cnf_formula import CNF_ASP
-from .sdd_formula import SDD
-from .engine_unify import *
-
-from .core import transform
-from .errors import GroundingError, NonGroundQuery
-from .util import Timer
-
 from subprocess import CalledProcessError
 
-# @transform(LogicProgram, LogicGraph)
-# def ground(model, target=None, grounder=None, **kwdargs):
-#     """Ground a given model.
+from .ground_gringo import ASP_Problog
 
-#     :param model: logic program to ground
-#     :type model: LogicProgram
-#     :return: the ground program
-#     :rtype: LogicFormula
-#     """
-#     from .ground_gringo import ground_to_graph
-#     return ground_to_dag(model, LogicGraph(), **kwdargs)
+from .core import transform
+from .engine_unify import *
+from .errors import NonGroundQuery
+from .formula import LogicFormula, LogicGraph
+from .logic import *
+from .program import LogicProgram, SimpleProgram
+from .util import Timer, mktempfile, subprocess_check_output
+from .ground_gringo import ASP_Problog, SmodelsParser
+
 
 @transform(LogicProgram, LogicGraph)
 def ground(model, target=None, grounder=None, **kwdargs):
@@ -59,38 +46,46 @@ def ground(model, target=None, grounder=None, **kwdargs):
     :param model: logic program to ground
     :type model: LogicProgram
     :return: the ground program
-    :rtype: LogicGraph
+    :rtype: LogicFormula
     """
-    from .ground_gringo import ground_to_cb_graph
-    return ground_to_cb_graph(model, **kwdargs)
+    return ground_gringo(model, target, **kwdargs)
 
-@transform(LogicProgram, CNF_ASP)
-def ground(model, target=None, grounder=None, **kwdargs):
+
+@transform(LogicProgram, LogicGraph)
+def ground_gringo(
+    model,
+    target=None,
+    queries=None,
+    evidence=None,
+    propagate_evidence=False,
+    labels=None,
+    engine=None,
+    **kwdargs,
+):
     """Ground a given model.
 
     :param model: logic program to ground
     :type model: LogicProgram
+    :param target: formula in which to store ground program
+    :type target: LogicFormula
+    :param queries: list of queries to override the default
+    :param evidence: list of evidence atoms to override the default
     :return: the ground program
     :rtype: LogicFormula
     """
-    from .ground_gringo import ground_to_cnf
-    return ground_to_cnf(model, **kwdargs)
 
-# @transform(LogicProgram, LogicFormula)
-def ground(model, target=None, grounder=None, **kwdargs):
-    """Ground a given model.
-
-    :param model: logic program to ground
-    :type model: LogicProgram
-    :return: the ground program
-    :rtype: LogicFormula
-    """
-    if grounder in ("yap", "yap_debug"):
-        from .ground_yap import ground_yap
-
-        return ground_yap(model, target, **kwdargs)
-    else:
-        return ground_default(model, target, **kwdargs)
+    kwdargs.update({"keep_all": True, "avoid_name_clash": True})
+    if engine is None:
+        engine = GringoEngine(**kwdargs)
+    return engine.ground_all(
+        model,
+        target,
+        queries=queries,
+        evidence=evidence,
+        propagate_evidence=propagate_evidence,
+        labels=labels,
+        **kwdargs,
+    )
 
 
 @transform(LogicProgram, LogicFormula)
@@ -102,7 +97,7 @@ def ground_default(
     propagate_evidence=False,
     labels=None,
     engine=None,
-    **kwdargs
+    **kwdargs,
 ):
     """Ground a given model.
 
@@ -130,47 +125,163 @@ def ground_default(
 class GenericEngine(object):  # pragma: no cover
     """Generic interface to a grounding engine."""
 
-    def prepare(self, db):
+    def prepare(self, db: LogicProgram):
         """Prepare the given database for querying.
         Calling this method is optional.
 
-       :param db: logic program
-       :returns: logic program in optimized format where builtins are initialized and directives \
-       have been evaluated
+        :param db: logic program
+        :returns: logic program in optimized format where builtins are initialized and directives \
+        have been evaluated
         """
         raise NotImplementedError("GenericEngine.prepare is an abstract method.")
 
-    def query(self, db, term):
+    def query(self, db: LogicProgram, term):
         """Evaluate a query without generating a ground program.
 
-       :param db: logic program
-       :param term: term to query; variables should be represented as None
-       :returns: list of tuples of argument for which the query succeeds.
+        :param db: logic program
+        :param term: term to query; variables should be represented as None
+        :returns: list of tuples of argument for which the query succeeds.
         """
         raise NotImplementedError("GenericEngine.query is an abstract method.")
 
-    def ground(self, db, term, target=None, label=None):
+    def ground(self, db: LogicProgram, term, target=None, label=None):
         """Ground a given query term and store the result in the given ground program.
 
-       :param db: logic program
-       :param term: term to ground; variables should be represented as None
-       :param target: target logic formula to store grounding in (a new one is created if none is \
-       given)
-       :param label: optional label (query, evidence, ...)
-       :returns: logic formula (target if given)
+        :param db: logic program
+        :param term: term to ground; variables should be represented as None
+        :param target: target logic formula to store grounding in (a new one is created if none is \
+        given)
+        :param label: optional label (query, evidence, ...)
+        :returns: logic formula (target if given)
         """
         raise NotImplementedError("GenericEngine.ground is an abstract method.")
 
-    def ground_all(self, db, target=None, queries=None, evidence=None):
+    def ground_all(self, db: LogicProgram, target=None, queries=None, evidence=None):
         """Ground all queries and evidence found in the the given database.
 
-       :param db: logic program
-       :param target: logic formula to ground into
-       :param queries: list of queries to evaluate instead of the ones in the logic program
-       :param evidence: list of evidence to evaluate instead of the ones in the logic program
-       :returns: ground program
+        :param db: logic program
+        :param target: logic formula to ground into
+        :param queries: list of queries to evaluate instead of the ones in the logic program
+        :param evidence: list of evidence to evaluate instead of the ones in the logic program
+        :returns: ground program
         """
         raise NotImplementedError("GenericEngine.ground_all is an abstract method.")
+
+
+class GringoEngine(GenericEngine):
+    def __init__(self, builtins=False, **kwdargs):
+
+        if builtins:
+            raise GroundingError("Builtins not supported by this grounding engine")
+
+        self.args = kwdargs.get("args")
+
+    def get_data(self, semiring):
+        return None
+
+    def prepare(self, db):
+        p = SimpleProgram()
+        for s in db:
+            p.add_statement(s)
+        return p
+
+    def ground(self, db, term, target=None, label=None, debug=False, **kwdargs):
+        """Ground a given query term and store the result in the given ground program.
+
+        :param db: logic program
+        :param term: term to ground; variables should be represented as None
+        :param target: target logic formula to store grounding in (a new one is created if none is \
+        given)
+        :param label: optional label (query, evidence, ...)
+        :returns: logic formula (target if given)
+        """
+
+        if label in ["query", "evidence"]:
+            db.add_statement(Term(label, term))
+        else:
+            if label is not None:
+                raise GroundingError(
+                    f"Not sure what to do with term {term} and label {label}"
+                )
+
+        with Timer("Grounding (Gringo)"):
+
+            if debug:
+                fn_model = "/tmp/gringo_input.pl"
+            else:
+                fn_model = mktempfile(".pl")
+
+            with open(fn_model, "w") as f:
+                f.write(str(db))
+
+            system = platform.system().lower()
+            gringo_ground = os.path.join(
+                os.path.dirname(__file__), "bin", system, "gringo"
+            )
+
+            cmd = [gringo_ground, "--keep-facts", fn_model]
+
+            try:
+                output = subprocess_check_output(cmd)
+            except CalledProcessError as err:
+                errmsg = err.output
+                print(errmsg.decode("utf-8"))
+                raise err
+
+            return output
+
+    def ground_all(self, db, target=None, queries=None, evidence=None, **kwdargs):
+        """Ground all queries and evidence found in the the given database.
+
+        :param db: logic program
+        :param target: logic formula to ground into but we don't use it here because we ground all
+        :param queries: list of queries to evaluate instead of the ones in the logic program
+        :param evidence: list of evidence to evaluate instead of the ones in the logic program. Format; [(term,bool)]
+        :returns: ground program
+        """
+
+        translator = ASP_Problog(db)
+        translator.add_statements(queries)
+        if evidence is not None:
+            for ev, val in evidence:
+                if val:
+                    translator.add_statement(Term("evidence", ev, Term("true")))
+                else:
+                    translator.add_statement(Term("evidence", ev, Term("false")))
+
+        asp_model = translator.translate()
+        ground_smodels = self.ground(
+            asp_model,
+            target,
+            None,
+            None,
+            **kwdargs,
+        )
+
+        print(kwdargs)
+        smodels = SmodelsParser(
+            ground_smodels, target=target, queries=queries, evidence=evidence, **kwdargs
+        )
+        ground_program = smodels.smodels2internal()
+
+        return ground_program
+
+    def query(self, db, term):
+        """
+        Works only on one level. Hacked to work for lfi
+        """
+        found = []
+        for stmt in db:
+            if (
+                isinstance(stmt, Term)
+                and stmt.functor == term.functor
+                and len(stmt.args) == len(term.args)
+            ):
+                if len(stmt.args) > 1:
+                    found.append((stmt.args[0], stmt.args[1]))
+                else:
+                    found.append((stmt.args[0], Term("true")))
+        return found
 
 
 class ClauseDBEngine(GenericEngine):
@@ -201,8 +312,8 @@ class ClauseDBEngine(GenericEngine):
 
     def get_builtin(self, index):
         """Get builtin's evaluation function based on its identifier.
-       :param index: index of the builtin
-       :return: function that evaluates the builtin
+        :param index: index of the builtin
+        :return: function that evaluates the builtin
         """
         real_index = -(index + 1)
         return self.__builtins[real_index]
@@ -257,17 +368,24 @@ class ClauseDBEngine(GenericEngine):
         term = Term("_directive")
         directive_node = db.find(term)
         if directive_node is not None:
-            directives = db.get_node(directive_node).children
+            directives_list = db.get_node(directive_node).children
+            # Emulate the order in which directives are encountered using a stack.
+            pending_directives = []
+            while directives_list:
+                pending_directives.append(directives_list.pop())
 
             gp = LogicFormula()
-            while directives:
-                current = directives.pop(0)
+            while pending_directives:
+                current = pending_directives.pop()
                 self.execute(
                     current,
                     database=db,
                     context=self.create_context((), define=None),
                     target=gp,
                 )
+                while directives_list:
+                    pending_directives.append(directives_list.pop())
+
         return True
 
     # noinspection PyUnusedLocal
@@ -349,22 +467,20 @@ class ClauseDBEngine(GenericEngine):
     def ground(self, db, term, target=None, label=None, **kwdargs):
         """Ground a query on the given database.
 
-       :param db: logic program
-       :type db: LogicProgram
-       :param term: query term
-       :type term: Term
-       :param gp: output data structure (for incremental grounding)
-       :type gp: LogicFormula
-       :param label: type of query (e.g. ``query``, ``evidence`` or ``-evidence``)
-       :type label: str
-       :param kwdargs: additional arguments
-       :return: ground program containing the query
-       :rtype: LogicFormula
+        :param db: logic program
+        :type db: LogicProgram
+        :param term: query term
+        :type term: Term
+        :param label: type of query (e.g. ``query``, ``evidence`` or ``-evidence``)
+        :type label: str
+        :param kwdargs: additional arguments
+        :return: ground program containing the query
+        :rtype: LogicFormula
         """
         if term.is_negated():
             negated = True
             term = -term
-        elif term.functor in ("not", "\+") and term.arity == 1:
+        elif term.functor in ("not", "\\+") and term.arity == 1:
             negated = True
             term = term.args[0]
         else:
@@ -673,6 +789,7 @@ class UnknownClause(GroundingError):
         self.signature = signature
 
 
-from .engine_stack import StackBasedEngine as DefaultEngine
+# from .engine_stack import StackBasedEngine as DefaultEngine
+DefaultEngine = GringoEngine
 
 from .clausedb import ClauseDB

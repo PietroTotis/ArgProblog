@@ -40,13 +40,13 @@ from .core import transform
 class BaseFormula(ProbLogObject):
     """Defines a basic logic formula consisting of nodes in some logical relation.
 
-        Each node is represented by a key. This key has the following properties:
-         - None indicates false
-         - 0 indicates true
-         - a number larger than 0 indicates a positive node
-         - the key -a with a a number larger than 0 indicates the negation of a
+    Each node is represented by a key. This key has the following properties:
+     - None indicates false
+     - 0 indicates true
+     - a number larger than 0 indicates a positive node
+     - the key -a with a a number larger than 0 indicates the negation of a
 
-        This data structure also support weights on nodes, names on nodes and constraints.
+    This data structure also support weights on nodes, names on nodes and constraints.
     """
 
     # Define special keys
@@ -63,12 +63,12 @@ class BaseFormula(ProbLogObject):
     LABEL_NAMED = "named"
 
     def __init__(self):
-        self._weights = {}               # Node weights: dict(key: Term)
+        self._weights = {}  # Node weights: dict(key: Term)
 
-        self._constraints = []           # Constraints: list of Constraint
-        self._cycle_constraints = []           # Constraints: list of Constraint
+        self._constraints = []  # Constraints: list of Constraint
+        self._cycle_constraints = []  # Constraints: list of Constraint
 
-        #self._names = defaultdict(OrderedDict)  # Node names: dict(label: dict(key, Term))
+        # self._names = defaultdict(OrderedDict)  # Node names: dict(label: dict(key, Term))
         self._names = defaultdict(dict)
         self._atomcount = 0
 
@@ -480,12 +480,11 @@ class LogicFormula(BaseFormula):
         keep_builtins=False,
         hide_builtins=False,
         database=None,
-        **kwdargs
+        **kwdargs,
     ):
         BaseFormula.__init__(self)
 
-
-        self.vtree = None # vtree for the formula
+        self.vtree = None  # vtree for the formula
         # List of nodes
         self._nodes = []
         # Lookup index for 'atom' nodes, key is identifier passed to addAtom()
@@ -526,10 +525,10 @@ class LogicFormula(BaseFormula):
     def add_name(self, name, key, label=None, keep_name=False):
         """Associates a name to the given node identifier.
 
-            :param name: name of the node
-            :param key: id of the node
-            :param label: type of node (see LogicFormula.LABEL_*)
-            :param keep_name: keep name of node if it exists
+        :param name: name of the node
+        :param key: id of the node
+        :param label: type of node (see LogicFormula.LABEL_*)
+        :param keep_name: keep name of node if it exists
         """
         if self._use_string_names:
             name = str(name)
@@ -921,10 +920,12 @@ class LogicFormula(BaseFormula):
     def constraints(self):
         """Returns a list of all constraints."""
         return list(self._constraints_me.values()) + BaseFormula.constraints(self)
-        
+
     def cycle_constraints(self):
         """Returns a list of all constraints."""
-        return list(self._cycle_constraints_me.values()) + BaseFormula.cycle_constraints(self)
+        return list(
+            self._cycle_constraints_me.values()
+        ) + BaseFormula.cycle_constraints(self)
 
     # ====================================================================================== #
     # ==========                      EVIDENCE PROPAGATION                       =========== #
@@ -1760,20 +1761,19 @@ class LogicDAG(LogicFormula):
     def __init__(self, auto_compact=True, **kwdargs):
         LogicFormula.__init__(self, auto_compact, **kwdargs)
 
-
     #######################
     ###   DSHARP ASP   ####
     #######################
 
-class LogicGraph(LogicFormula):
 
+class LogicGraph(LogicFormula):
     def __init__(self, cnf_str=None, auto_compact=True, **kwdargs):
         LogicFormula.__init__(self, auto_compact, **kwdargs)
         self.founded_vars = set()
         self.scc = {}
         self.in_neg_cycles = None
         self.cnf_str = cnf_str
-        self.defined = [] # defined vars
+        self.defined = []  # defined vars
 
     def get_in_neg_cycles(self):
         if self.in_neg_cycles is None:
@@ -1783,14 +1783,14 @@ class LogicGraph(LogicFormula):
 
     def get_founded_by_name(self, name):
         for index, node, nodetype in self:
-            if node.name == name and not hasattr(node, 'probability'):
+            if node.name == name and not hasattr(node, "probability"):
                 return index
         raise KeyError(name)
 
     def is_anon_conj(self, key):
         if key > 0:
             node = self.get_node(key)
-            if isinstance(node,conj):
+            if isinstance(node, conj):
                 if not self._is_valid_name(node.name):
                     return True
         return False
@@ -1800,13 +1800,13 @@ class LogicGraph(LogicFormula):
         recovers from internal format a smodels-like descriprion of the clauses:
         r [scc id] [head id] [head] [body id] [pos body ids] 0 [neg body ids]
         """
-        b_pos = [lit for lit in body if lit>0]
-        b_neg = [lit for lit in body if lit<0]
-        b_neg_abs = list(map(abs,b_neg))
-        max_lit = max(b_pos+b_neg_abs+[body_id])
-        b_pos_stmt = " ".join(list(map(str,b_pos)))
-        b_neg_stmt = " ".join(list(map(str,b_neg_abs)))
-        stmt = " ".join(list(map(str,["r", self.scc[body_id], head, body_id])))
+        b_pos = [lit for lit in body if lit > 0]
+        b_neg = [lit for lit in body if lit < 0]
+        b_neg_abs = list(map(abs, b_neg))
+        max_lit = max(b_pos + b_neg_abs + [body_id])
+        b_pos_stmt = " ".join(list(map(str, b_pos)))
+        b_neg_stmt = " ".join(list(map(str, b_neg_abs)))
+        stmt = " ".join(list(map(str, ["r", self.scc[body_id], head, body_id])))
         if len(b_pos) > 0:
             stmt += f" {b_pos_stmt}"
         stmt += " 0"
@@ -1833,7 +1833,7 @@ class LogicGraph(LogicFormula):
 
     def replace_non_anon_conj(self):
         """
-        add an extra rule "name :- conjunction" for conjunctions corresponding to 
+        add an extra rule "name :- conjunction" for conjunctions corresponding to
         an atom, so that we take that into account when generating the sccs, founded
         vars and rules for the cnf (needed for ADs and likely for other cases)
         """
@@ -1842,8 +1842,8 @@ class LogicGraph(LogicFormula):
             if nodetype == "conj" and name is not None:
                 anon_node = conj(node.children, None)
                 self._update(index, anon_node)
-                self.add_or((index,), name=name)#, placeholder=True)
-        
+                self.add_or((index,), name=name)  # , placeholder=True)
+
     def compute_sccs(self):
         self.founded_vars = set()
         self.scc = {}
@@ -1863,13 +1863,13 @@ class LogicGraph(LogicFormula):
 
         self.replace_non_anon_conj()
         # e_ids =[e[1] for e in self.evidence_all()]
-        # self.propagate(e_ids) 
+        # self.propagate(e_ids)
 
         for index, node, nodetype in self:
-            if node.name is not None and not hasattr(node, 'probability'):
+            if node.name is not None and not hasattr(node, "probability"):
                 self.founded_vars.add(index)
             if nodetype == "disj":
-                if len(node.children) >1:
+                if len(node.children) > 1:
                     for c in node.children:
                         if self.is_anon_conj(c):
                             self.body_ids.append(c)
@@ -1877,52 +1877,52 @@ class LogicGraph(LogicFormula):
         self.check_neg_cycles()
 
         for v in self.founded_vars:
-            if (not (v in self.node_idx)):
+            if not (v in self.node_idx):
                 self.strong_connect(v)
-        
+
         for i, n, nodetype in self:
             if nodetype == "disj":
                 for c in n.children:
                     if c not in self.node_idx:
                         self.strong_connect(c)
-        
-    def add_to_stack(self, node) :
+
+    def add_to_stack(self, node):
         self.stack.append(node)
         self.in_stack.add(node)
-        
-    def pop_from_stack(self) :
+
+    def pop_from_stack(self):
         node = self.stack.pop()
         self.in_stack.remove(node)
         return node
-            
-    def strong_connect(self, node) :
+
+    def strong_connect(self, node):
         self.node_idx[node] = self.curr_idx
         self.node_root[node] = self.curr_idx
         self.curr_idx += 1
         self.add_to_stack(node)
-        
+
         succs = self.get_successors(node)
-        
-        for s in succs :
-            if (not (s in self.node_idx)) :
+
+        for s in succs:
+            if not (s in self.node_idx):
                 self.strong_connect(s)
                 self.node_root[node] = min(self.node_root[s], self.node_root[node])
-            elif (s in self.in_stack) :
+            elif s in self.in_stack:
                 self.node_root[node] = min(self.node_idx[s], self.node_root[node])
-        if (self.node_root[node] == self.node_idx[node]) :
+        if self.node_root[node] == self.node_idx[node]:
             nodes = []
             scc_num = len(self.nodes_in_scc)
-            while (self.stack):
+            while self.stack:
                 b = self.pop_from_stack()
                 nodes.append(b)
                 self.scc[b] = scc_num
-                if (b == node):
+                if b == node:
                     break
             self.nodes_in_scc.append(nodes)
 
     def get_successors(self, n):
         if n <= 0:
-            return []   
+            return []
         node = self.get_node(n)
         if isinstance(node, atom):
             lits = []
@@ -1939,9 +1939,11 @@ class LogicGraph(LogicFormula):
         for v in self.founded_vars:
             neg = self.follow(v, False, [])
             self.neg_cycles = self.neg_cycles or neg
-    
+
     def follow(self, n, negation, visited):
-        neg = (n<=0)
+        if n == 0:
+            return False
+        neg = n < 0
         negation = negation or neg
         # print("\t", n, visited)
         visited.append(n)
@@ -1949,7 +1951,7 @@ class LogicGraph(LogicFormula):
             node = self.get_node(-n)
         else:
             node = self.get_node(n)
-        if isinstance(node,atom):
+        if isinstance(node, atom):
             return False
         elif isinstance(node, disj):
             lits = node.children
@@ -2062,55 +2064,56 @@ def dag_to_nnf(source, target=None, **kwargs):
 
     return target
 
+
 # @transform(LogicGraph, LogicDAG)
 # def graph_to_dag(source, destination=None, **kwargs):
-    # remove negative cycles (only after "positive" cycle breaking)
-    
-    # if destination is None:
-    #     destination = LogicDAG()
+# remove negative cycles (only after "positive" cycle breaking)
 
-    # in_neg_cycles = source.get_in_neg_cycles()
-    # print(in_neg_cycles)
-    # inc = 0
-    # neg_map = {}
-    # translation = {}
+# if destination is None:
+#     destination = LogicDAG()
 
-    # def translate(index):
-    #     if index >0:
-    #         return translation[index]
-    #     else:
-    #         return -translation[-index]
+# in_neg_cycles = source.get_in_neg_cycles()
+# print(in_neg_cycles)
+# inc = 0
+# neg_map = {}
+# translation = {}
+
+# def translate(index):
+#     if index >0:
+#         return translation[index]
+#     else:
+#         return -translation[-index]
 
 
-    # for i, n, t in source:
-    #     if t == "atom":
-    #         j = destination.add_atom(
-    #             n.identifier,
-    #             n.probability,
-    #             n.group,
-    #             name=source.get_name(i),
-    #             cr_extra=False,
-    #         )
-    #         translation[i] = j
-    # # translation map
-    # for atom in in_neg_cycles:
-    #     nbc_id = destination.add_atom(f"_nbc{atom}", None, name=Term(f"nbc{inc}"))
-    #     # not_nbc = destination.add_atom(f"_nbcn{atom}", None, name=Term(f"nbcn{inc}"))
-    #     neg_map[atom] = nbc_id
+# for i, n, t in source:
+#     if t == "atom":
+#         j = destination.add_atom(
+#             n.identifier,
+#             n.probability,
+#             n.group,
+#             name=source.get_name(i),
+#             cr_extra=False,
+#         )
+#         translation[i] = j
+# # translation map
+# for atom in in_neg_cycles:
+#     nbc_id = destination.add_atom(f"_nbc{atom}", None, name=Term(f"nbc{inc}"))
+#     # not_nbc = destination.add_atom(f"_nbcn{atom}", None, name=Term(f"nbcn{inc}"))
+#     neg_map[atom] = nbc_id
 
-    # print(translation)
-    # print(destination)
-    # for i, n, t in source:
-    #     if t != "atom":
-    #         children = [neg_map.get(c,translate(c)) for c in n.children]
-    #     print(i,n,children)
-    #     if t == "conj":
-    #         j = destination.add_and(children, name=n.name)
-    #     else:
-    #         j = destination.add_or(children, name=n.name)
-    #     translation[i] = j
-    
-    # constraints = [destination.add_and([id,-neg_map[id]]) for id in neg_map]
-    # destination.add_and([-c for c in constraints])    
+# print(translation)
+# print(destination)
+# for i, n, t in source:
+#     if t != "atom":
+#         children = [neg_map.get(c,translate(c)) for c in n.children]
+#     print(i,n,children)
+#     if t == "conj":
+#         j = destination.add_and(children, name=n.name)
+#     else:
+#         j = destination.add_or(children, name=n.name)
+#     translation[i] = j
 
-    # return destination
+# constraints = [destination.add_and([id,-neg_map[id]]) for id in neg_map]
+# destination.add_and([-c for c in constraints])
+
+# return destination

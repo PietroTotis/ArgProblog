@@ -26,7 +26,7 @@ import time
 
 from ..program import PrologFile, SimpleProgram
 from ..logic import Term, Clause
-from ..engine import DefaultEngine
+from ..engine import DefaultEngine, GringoEngine
 from ..evaluator import SemiringLogProbability, SemiringProbability, SemiringSymbolic
 from .. import get_evaluatable, get_evaluatables, library_paths
 
@@ -103,7 +103,7 @@ def execute(
     combine=False,
     profile=False,
     trace=False,
-    **kwdargs
+    **kwdargs,
 ):
     """Run ProbLog.
 
@@ -136,13 +136,9 @@ def execute(
             else:
                 profiler = None
 
-            kwdargs.update({'keep_all':True, 'avoid_name_clash':True})
-
-            engine = DefaultEngine(**kwdargs)
-            db = engine.prepare(model)
-            db_semiring = db.get_data("semiring")
-            if db_semiring is not None:
-                semiring = db_semiring
+            kwdargs.update({"keep_all": True, "avoid_name_clash": True})
+            engine = GringoEngine(**kwdargs)
+            db = model
             if knowledge is None or type(knowledge) == str:
                 knowledge = get_evaluatable(knowledge, semiring=semiring)
             formula = knowledge.create_from(db, engine=engine, database=db, **kwdargs)

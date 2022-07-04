@@ -548,7 +548,7 @@ class Term(object):
                 p=p,
                 location=self.location,
                 priority=self.op_priority,
-                opspec=self.op_spec
+                opspec=self.op_spec,
             )
         else:
             if self.__class__ in (Clause, AnnotatedDisjunction, And, Or):
@@ -556,7 +556,7 @@ class Term(object):
                     *args,
                     location=self.location,
                     priority=self.op_priority,
-                    opspec=self.op_spec
+                    opspec=self.op_spec,
                 )
             else:
                 return self.__class__(
@@ -564,7 +564,7 @@ class Term(object):
                     *args,
                     location=self.location,
                     priority=self.op_priority,
-                    opspec=self.op_spec
+                    opspec=self.op_spec,
                 )
 
     def with_probability(self, p=None):
@@ -579,7 +579,7 @@ class Term(object):
             p=p,
             priority=self.op_priority,
             opspec=self.op_spec,
-            location=self.location
+            location=self.location,
         )
 
     def is_var(self):
@@ -612,7 +612,7 @@ class Term(object):
         return False
 
     def is_query(self):
-        return self.__functor=="query"
+        return self.__functor == "query"
 
     def asp_string(self):
         if self.probability is not None:
@@ -823,8 +823,8 @@ class Var(Term):
 class Constant(Term):
     """A constant.
 
-        :param value: the value of the constant
-        :type value: :class:`str`, :class:`float` or :class:`int`.
+    :param value: the value of the constant
+    :type value: :class:`str`, :class:`float` or :class:`int`.
 
     """
 
@@ -850,24 +850,24 @@ class Constant(Term):
     def is_string(self):
         """Check whether this constant is a string.
 
-            :returns: true if the value represents a string
-            :rtype: :class:`bool`
+        :returns: true if the value represents a string
+        :rtype: :class:`bool`
         """
         return type(self.value) == str
 
     def is_float(self):
         """Check whether this constant is a float.
 
-            :returns: true if the value represents a float
-            :rtype: :class:`bool`
+        :returns: true if the value represents a float
+        :rtype: :class:`bool`
         """
         return type(self.value) == float
 
     def is_integer(self):
         """Check whether this constant is an integer.
 
-            :returns: true if the value represents an integer
-            :rtype: :class:`bool`
+        :returns: true if the value represents an integer
+        :rtype: :class:`bool`
         """
         return type(self.value) == int
 
@@ -878,7 +878,7 @@ class Constant(Term):
 class Object(Term):
     """A wrapped object.
 
-        :param value: the wrapped object
+    :param value: the wrapped object
 
     """
 
@@ -901,24 +901,24 @@ class Object(Term):
     def is_string(self):
         """Check whether this constant is a string.
 
-            :returns: true if the value represents a string
-            :rtype: :class:`bool`
+        :returns: true if the value represents a string
+        :rtype: :class:`bool`
         """
         return False
 
     def is_float(self):
         """Check whether this constant is a float.
 
-            :returns: true if the value represents a float
-            :rtype: :class:`bool`
+        :returns: true if the value represents a float
+        :rtype: :class:`bool`
         """
         return False
 
     def is_integer(self):
         """Check whether this constant is an integer.
 
-            :returns: true if the value represents an integer
-            :rtype: :class:`bool`
+        :returns: true if the value represents an integer
+        :rtype: :class:`bool`
         """
         return False
 
@@ -971,7 +971,7 @@ class AnnotatedDisjunction(Term):
 
     def asp_string(self):
         heads = ";".join([h.asp_string() for h in self.heads])
-        head = "1 {"+ heads + "} 1"
+        head = "1 {" + heads + "} 1"
         body = self.body.asp_string()
         return f"{head} :- {body}"
 
@@ -1119,7 +1119,7 @@ class Not(Term):
             self.repr = "%s%s" % (self.functor, c)
         self.reprhash = hash(self.repr)
         return self.repr
-    
+
     def asp_string(self):
         return f"not {self.child.asp_string()}"
 
@@ -1153,8 +1153,8 @@ _arithmetic_functions = {
     ("rem", 2): (lambda a, b: a % b),
     ("div", 2): (lambda a, b: (a - (a % b)) // b),
     ("div", 2): (lambda a, b: (a - (a % b)) // b),
-    ("**", 2): (lambda a, b: a ** b),
-    ("^", 2): (lambda a, b: a ** b),
+    ("**", 2): (lambda a, b: a**b),
+    ("^", 2): (lambda a, b: a**b),
     ("+", 1): (lambda a: a),
     ("-", 1): (lambda a: -a),
     ("\\", 1): (lambda a: ~a),
