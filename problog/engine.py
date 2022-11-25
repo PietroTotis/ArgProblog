@@ -257,8 +257,7 @@ class GringoEngine(GenericEngine):
             None,
             **kwdargs,
         )
-
-        print(kwdargs)
+        
         smodels = SmodelsParser(
             ground_smodels, target=target, queries=queries, evidence=evidence, **kwdargs
         )

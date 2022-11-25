@@ -163,7 +163,10 @@ def _break_cycles(
         newname = node.name
         if newname is not None and child_cycles_broken:
             newfunc = (
-                cycle_var_prefix + newname.functor + "_cb_" + str(len(translation[nodeid]))
+                cycle_var_prefix
+                + newname.functor
+                + "_cb_"
+                + str(len(translation[nodeid]))
             )
             newname = Term(newfunc, *newname.args)
         if nodetype == "conj":
@@ -214,9 +217,12 @@ def break_neg_cycles(source, target, translation=None, **kwdargs):
             )
             content |= visited
             target.add_name(q, newnode, l)
+        for l, id in source.evidence():
+            target.add_evidence(name=l, key=abs(id), value=(id > 0))
         # print(target.to_prolog())
         # print(target)
         return target
+
 
 def _break_neg_cycles(
     source,
@@ -227,7 +233,7 @@ def _break_neg_cycles(
     content,
     translation,
     is_evidence=False,
-    lvl = 0
+    lvl=0,
 ):
     negative_node = nodeid < 0
     nodeid = abs(nodeid)
@@ -240,10 +246,10 @@ def _break_neg_cycles(
         """
         Cycle found, since positive cycles should already be broken, it involves negation:
         replace current node with a new var newnode2 and the parent with a new variable newnode1.
-        Then recursively replace them with the new variables and add the constraints that bind the 
+        Then recursively replace them with the new variables and add the constraints that bind the
         new variables to the original ones
         """
-        cycle_nodes = ancestors[ancestors.index(nodeid):]
+        cycle_nodes = ancestors[ancestors.index(nodeid) :]
         cycle = "_".join([str(i) for i in cycle_nodes])
         # print("cycle", nodeid, ancestors, cycle)
         newname1 = source.get_node(ancestors[-1]).name
@@ -256,8 +262,12 @@ def _break_neg_cycles(
         newfunc2 = cycle_var_prefix + newname2.functor + "_" + cycle
         newname1 = Term(newfunc1, *newname1.args)
         newname2 = Term(newfunc2, *newname2.args)
-        newnode1 = target.add_atom(newfunc1, probability=target.WEIGHT_NEUTRAL, name=newname1)
-        newnode2 = target.add_atom(newfunc2, probability=target.WEIGHT_NEUTRAL, name=newname2)
+        newnode1 = target.add_atom(
+            newfunc1, probability=target.WEIGHT_NEUTRAL, name=newname1
+        )
+        newnode2 = target.add_atom(
+            newfunc2, probability=target.WEIGHT_NEUTRAL, name=newname2
+        )
 
         # ancestors[-1] : add newnode1 to the children for first cycle breaking var
         #               : add consistency constraints between ancestors[-1] and newnode1
@@ -274,7 +284,7 @@ def _break_neg_cycles(
     else:
         broken_cycles = []
         constraints = []
-        if nodeid in content: # already visited and done
+        if nodeid in content:  # already visited and done
             # print(nodeid, " visited")
             id, cb, cont = translation[nodeid]
             content |= cont
@@ -290,21 +300,21 @@ def _break_neg_cycles(
             children = []
             for child in node.children:
                 new_c, child_broken_cycles, content_c = _break_neg_cycles(
-                        source,
-                        target,
-                        child,
-                        ancestors + [nodeid],
-                        cycles_broken,
-                        content,
-                        translation,
-                        is_evidence,
-                        lvl = lvl +1
-                    )
+                    source,
+                    target,
+                    child,
+                    ancestors + [nodeid],
+                    cycles_broken,
+                    content,
+                    translation,
+                    is_evidence,
+                    lvl=lvl + 1,
+                )
                 skip = False
                 for cycle in child_broken_cycles:
                     if cycle[0] == nodeid:
                         """
-                        we just closed a cycle: replace child with the new var 
+                        we just closed a cycle: replace child with the new var
                         """
                         if child < 0:
                             children.append(target.negate(cycle[3]))
@@ -312,7 +322,9 @@ def _break_neg_cycles(
                             children.append(cycle[3])
                         constraints.append(cycle[2])
                         skip = skip or True
-                        broken_cycles.append(cycle) # and propagate the info for the second var
+                        broken_cycles.append(
+                            cycle
+                        )  # and propagate the info for the second var
                     elif cycle[1] == nodeid:
                         """
                         a cycle was closed by the child: add the second cb var
@@ -322,11 +334,15 @@ def _break_neg_cycles(
                         else:
                             children.append(cycle[2])
                         skip = skip or True
-                        if cycle[4] == nodeid: # if newnode2 is for this node add constraints and forget
+                        if (
+                            cycle[4] == nodeid
+                        ):  # if newnode2 is for this node add constraints and forget
                             constraints.append(cycle[3])
                         else:  # move upwards until we find the origin of the cycle
                             broken_cycles.append(cycle)
-                    elif cycle[4] == nodeid: # if newnode2 is for this node add constraints and forget
+                    elif (
+                        cycle[4] == nodeid
+                    ):  # if newnode2 is for this node add constraints and forget
                         constraints.append(cycle[3])
                     else:  # move upwards until we find the origin of the cycle
                         broken_cycles.append(cycle)
@@ -346,10 +362,10 @@ def _break_neg_cycles(
 
         # print("\t",nodeid, constraints, broken_cycles)
 
-        for k in constraints: # add all the iff constraints involving newnode
+        for k in constraints:  # add all the iff constraints involving newnode
             c1 = target.add_and([newnode, k])
             c2 = target.add_and([-newnode, -k])
-            c  = target.add_or([c1,c2], name = Term(f"iff_{newnode}_{k}"))
+            c = target.add_or([c1, c2], name=Term(f"iff_{newnode}_{k}"))
             target.add_cycle_constraint(TrueConstraint(c))
 
         # print(content, cycles_broken)

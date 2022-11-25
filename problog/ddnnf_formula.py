@@ -80,6 +80,7 @@ class SimpleDDNNFEvaluator(Evaluator):
         self.models = []
         self.multi_sm = {}
         self.valid_choices = set()
+        # print(len(formula))
         # print(formula.to_dot())
 
         self.multi_stable_models()
@@ -204,7 +205,28 @@ class SimpleDDNNFEvaluator(Evaluator):
                         w = self.semiring.negate(b)
         return w
 
+    def mpe(self):
+        max = 0
+        max_c = []
+        for m in self.models:
+            choices = frozenset([a for a in m if abs(a) in self.choices])
+            # l = len(self.multi_sm.get(choices, [1]))
+            # norm = self.semiring.value(1 / l)
+            probs = [self._get_weight(a) for a in choices]
+            p = self.semiring.one()
+            for c in probs:
+                p = self.semiring.times(p, c)
+            # p = self.semiring.times(norm, p)
+            if p > max:
+                max = p
+                max_c = [
+                    (self.formula.get_name(a), self._get_weight(a)) for a in choices
+                ]
+        # print(max_c, max)
+        return (max_c, max)
+
     def query(self, index):
+        # self.mpe()
         if len(list(self.evidence())) == 0:
             root_weight = self._get_z()
             inconsistent_weight = self.semiring.negate(root_weight)
@@ -662,7 +684,7 @@ class SimpleDDNNFEvaluator(Evaluator):
             }
             # print(self.keyworlds)
             end = time.time()
-            print(f"Enumeration: {round(end-start,3)}s")
+            # print(f"Enumeration: {round(end-start,3)}s")
 
 
 class Compiler(object):
@@ -844,7 +866,7 @@ def _compile(cnf, cmd, cnf_file, nnf_file):
                 with open(os.devnull, "w") as OUT_NULL:
                     subprocess_check_call(cmd, stdout=OUT_NULL)
                 end = time.time()
-                print(f"Compilation: {round(end-start,3)}s")
+                # print(f"Compilation: {round(end-start,3)}s")
                 # i = out.find("# of solutions:")
                 # j = out.find("#SAT")
                 # n_models = float(out[i+17:j])

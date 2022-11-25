@@ -101,7 +101,7 @@ class SDD(DD):
 
     @init_varcount.setter
     def init_varcount(self, value=0):
-        """Set the varcount with which to initialise the manager. Only call before calling the manager """
+        """Set the varcount with which to initialise the manager. Only call before calling the manager"""
         assert self.inode_manager is None
         self._init_varcount = value
 
@@ -111,7 +111,7 @@ class SDD(DD):
             var_constraint=self.var_constraint,
             varcount=self.init_varcount,
             vtree=self.vtree,
-            litnamemap=self.lnm
+            litnamemap=self.lnm,
         )
 
     def _create_evaluator(self, semiring, weights, **kwargs):
@@ -160,7 +160,7 @@ class SDD(DD):
         )
 
     def get_litnamemap(self):
-        """ Get a dictionary mapping literal IDs (inode index) to names. e.g; {1:'x', -1:'-x'}"""
+        """Get a dictionary mapping literal IDs (inode index) to names. e.g; {1:'x', -1:'-x'}"""
         litnamemap = dict()
         var_count = self.get_manager().varcount
         for (name, index) in self.get_names():
@@ -234,13 +234,21 @@ class SDD(DD):
     #         cnf_file = cnf_file
     #     )
 
+
 class SDDManager(DDManager):
     """
     Manager for SDDs.
     It wraps around the SDD library and offers some additional methods.
     """
 
-    def __init__(self, varcount=0, auto_gc=False, var_constraint=None, vtree=None, litnamemap=None):
+    def __init__(
+        self,
+        varcount=0,
+        auto_gc=False,
+        var_constraint=None,
+        vtree=None,
+        litnamemap=None,
+    ):
         """Create a new SDD manager.
 
         :param varcount: number of initial variables
@@ -258,7 +266,9 @@ class SDDManager(DDManager):
             self.x_constraint = self._to_x_constrained_list(varcount, var_constraint)
             if vtree is None:
                 vtree = Vtree.new_with_X_constrained(
-                    var_count=varcount, is_X_var=self.x_constraint, vtree_type="balanced"
+                    var_count=varcount,
+                    is_X_var=self.x_constraint,
+                    vtree_type="balanced",
                 )
 
         self.__manager = sdd.SddManager(
@@ -418,8 +428,8 @@ class SDDManager(DDManager):
         perform_smoothing=True,
         smooth_to_root=False,
         wmc_func=None,
-        normalize = True,
-        debug=True
+        normalize=True,
+        debug=True,
     ):
         """Perform Weighted Model Count on the given node or the given literal.
 
@@ -452,7 +462,7 @@ class SDDManager(DDManager):
                 weights=weights,
                 semiring=semiring,
                 perform_smoothing=perform_smoothing,
-                normalize=normalize
+                normalize=normalize,
             )
 
         # Cover edge case e.g. node=SddNode(True)
@@ -465,12 +475,8 @@ class SDDManager(DDManager):
             )  # because 1 + 0 = 1 and 1 * x = x
 
         # Calculate result
-        query_node = (
-            node if literal is None else self.get_manager().literal(literal)
-        )
-        sdd_iterator = SddIterator(
-            self.get_manager(), smooth_to_root=smooth_to_root
-        )
+        query_node = node if literal is None else self.get_manager().literal(literal)
+        sdd_iterator = SddIterator(self.get_manager(), smooth_to_root=smooth_to_root)
         result = sdd_iterator.depth_first(query_node, wmc_func)
 
         if weights.get(0) is not None:  # Times the weight of True
@@ -501,7 +507,7 @@ class SDDManager(DDManager):
         def func_weightedmodelcounting(
             node, rvalues, expected_prime_vars, expected_sub_vars
         ):
-            """ Method to pass on to SddIterator's ``depth_first`` to perform weighted model counting."""
+            """Method to pass on to SddIterator's ``depth_first`` to perform weighted model counting."""
             if rvalues is None:
                 # Leaf
                 if node.is_true():
@@ -570,7 +576,7 @@ class SDDManager(DDManager):
                 # Decision node
                 if node is not None and not node.is_decision():
                     raise Exception("Expected a decision node for node {}".format(node))
-                
+
                 result_weight = None
                 for prime_weight, sub_weight, prime_vars, sub_vars in rvalues:
                     branch_weight = semiring.times(prime_weight, sub_weight)
@@ -875,6 +881,7 @@ x_constrained = namedtuple(
 
 class SDDEvaluator(DDEvaluator):
     def __init__(self, formula, semiring, weights=None, **kwargs):
+        print(formula)
         DDEvaluator.__init__(self, formula, semiring, weights, **kwargs)
 
     def evaluate_custom(self, node):
@@ -940,10 +947,7 @@ class SDDEvaluator(DDEvaluator):
                 self._evidence_weight = self.semiring.normalize(
                     result, self.normalization
                 )
-
         return self._evidence_weight
-
-
 
 
 @transform(LogicDAG, SDD)

@@ -296,6 +296,8 @@ class SmodelsParser:
 
         self.new_var = 0
 
+        # print(gringo_output)
+
         self.read_smodels()
         self.parse_smodels()
 
@@ -526,20 +528,24 @@ class SmodelsParser:
         for raw_choice_rule in self.raw_choice_rules:
             self.parse_ad_rule(raw_choice_rule)
 
+        self.facts_with_probs = {}
         for f_id in self.facts:  # re-associate probabilities with facts
             f = self.facts[f_id]
             if f_id in self.probs:
-                self.facts[f_id] = []
+                self.facts_with_probs[f_id] = []
                 for p in self.probs[f_id]:
                     prob, line = p
                     if line not in self.ad_lines:
-                        self.facts[f_id].append(f.with_args(*f.args, p=prob))
+                        self.facts_with_probs[f_id].append(f.with_args(*f.args, p=prob))
             else:
                 if self.facts[f_id].functor.startswith("aux"):
-                    del self.facts[f_id]
+                    # del self.facts[f_id]
+                    pass
                 else:  # no probability found: fact
                     #     # ft = f.with_args(*f.args, p=True)
-                    self.facts[f_id] = [f]
+                    self.facts_with_probs[f_id] = [f]
+
+        self.facts = self.facts_with_probs
 
         for f_id in self.gringo_facts:  # re-associate probabilities with rules
             f = self.gringo_facts[f_id]
@@ -659,7 +665,8 @@ class SmodelsParser:
                 constr.add(id, lf)
             if ad.body:
                 for node in constr.nodes:
-                    name = lf.get_node(node).name.args[2]
+                    # name = lf.get_node(node).name.args[2]
+                    name = lf.get_node(node).name
                     or_id = lf.get_node_by_name(name)
                     and_id = lf.add_and([body_id, node])
                     lf.add_disjunct(or_id, and_id)
@@ -696,7 +703,7 @@ class SmodelsParser:
                 id = -id
             else:
                 val = LogicFormula.LABEL_EVIDENCE_POS
-            lf.add_evidence(e_term.with_probability(), id, val)
+            lf.add_evidence(e_term.with_probability(), id, val, True)
             if self.propagate_evidence:
                 lf.propagate([id])
 

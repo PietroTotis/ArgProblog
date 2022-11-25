@@ -963,12 +963,12 @@ class LFIProblem(LogicProgram):
     def run(self):
         tic = timeit.default_timer()
         self.prepare()
-        toc = timeit.default_timer()
-        getLogger("problog_lfi").info("Compile time: %f" % (toc - tic))
-        getLogger("problog_lfi").info("Weights to learn: %s" % self.names)
-        getLogger("problog_lfi").info("Bodies: %s" % self.bodies)
-        getLogger("problog_lfi").info("Parents: %s" % self.parents)
-        getLogger("problog_lfi").info("Initial weights: %s" % self._weights)
+        # toc = timeit.default_timer()
+        # getLogger("problog_lfi").info("Compile time: %f" % (toc - tic))
+        # getLogger("problog_lfi").info("Weights to learn: %s" % self.names)
+        # getLogger("problog_lfi").info("Bodies: %s" % self.bodies)
+        # getLogger("problog_lfi").info("Parents: %s" % self.parents)
+        # getLogger("problog_lfi").info("Initial weights: %s" % self._weights)
 
         # if self._log:
         #     new_w = []
@@ -976,28 +976,28 @@ class LFIProblem(LogicProgram):
         #         new_w.append(math.log(w))
         #     self._weights = new_w
 
-        delta = 1000
-        prev_score = -1e10
-        tic = timeit.default_timer()
-        # while self.iteration < self.max_iter and (delta > self.min_improv):
-        while self.iteration < self.max_iter and (delta < 0 or delta > self.min_improv):
-            score = self.step()
-            getLogger("problog_lfi").info(
-                "Weights after iteration %s: %s" % (self.iteration, self._weights)
-            )
-            getLogger("problog_lfi").info(
-                "Score after iteration %s: %s" % (self.iteration, score)
-            )
-            # Let p_1, ..., p_N the parameters we need to learn
-            # Let p_{1,m}, ..., p_{n,m} the estimates in the m-th iteration
-            # delta is (log(p_{1,m+1}) + ... + log(p_{N,m+1})) - (log(p_{1,m}) + ... + log(p_{N,m}))
-            # In other words, 10^delta = (p_{1,m+1} * ... *p_{N,m+1})/(p_{1,m} * ... * p_{N,m})
-            # delta = abs(score - prev_score)
-            delta = score - prev_score
-            prev_score = score
-        toc = timeit.default_timer()
-        getLogger("problog_lfi").info("Evaluation time: %f" % (toc - tic))
-        return prev_score
+        # delta = 1000
+        # prev_score = -1e10
+        # tic = timeit.default_timer()
+        # # while self.iteration < self.max_iter and (delta > self.min_improv):
+        # while self.iteration < self.max_iter and (delta < 0 or delta > self.min_improv):
+        #     score = self.step()
+        #     getLogger("problog_lfi").info(
+        #         "Weights after iteration %s: %s" % (self.iteration, self._weights)
+        #     )
+        #     getLogger("problog_lfi").info(
+        #         "Score after iteration %s: %s" % (self.iteration, score)
+        #     )
+        #     # Let p_1, ..., p_N the parameters we need to learn
+        #     # Let p_{1,m}, ..., p_{n,m} the estimates in the m-th iteration
+        #     # delta is (log(p_{1,m+1}) + ... + log(p_{N,m+1})) - (log(p_{1,m}) + ... + log(p_{N,m}))
+        #     # In other words, 10^delta = (p_{1,m+1} * ... *p_{N,m+1})/(p_{1,m} * ... * p_{N,m})
+        #     # delta = abs(score - prev_score)
+        #     delta = score - prev_score
+        #     prev_score = score
+        # toc = timeit.default_timer()
+        # getLogger("problog_lfi").info("Evaluation time: %f" % (toc - tic))
+        # return prev_score
 
 
 class ExampleSet(object):
@@ -1137,6 +1137,7 @@ class Example(object):
         )
 
         self.compiled = lfi.knowledge.create_from(ground_program)
+        print(len(self.compiled))
         try:
             logger.debug(
                 "\tCompiled program:\n\t\t"

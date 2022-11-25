@@ -443,8 +443,7 @@ class SemiringDensity(Semiring):
         return a
 
     def normalize(self, a, z):
-        """Normalization computes a_i / z_i and returns the lowest rank non-zero coefficient.
-        """
+        """Normalization computes a_i / z_i and returns the lowest rank non-zero coefficient."""
         if -1e-12 < a < 1e-12:
             return 0.0
         return a / z
@@ -551,10 +550,10 @@ class Evaluatable(ProbLogObject):
                     value = evidence[ev_name]
                     if value is None:
                         pass
-                    elif value:
-                        evaluator.add_evidence(ev_index)
-                    else:
-                        evaluator.add_evidence(-ev_index)
+                    # elif value:
+                    evaluator.add_evidence(ev_index)
+                    # else:
+                    #     evaluator.add_evidence(-ev_index)
                 except KeyError:
                     if keep_evidence:
                         evaluator.add_evidence(ev_value * ev_index)

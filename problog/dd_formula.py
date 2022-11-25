@@ -210,6 +210,7 @@ class DD(LogicGraph, EvaluatableDSP):
         else:
             return self.to_formula().to_dot(*args, **kwargs)
 
+
 class DDManager(object):
     """
     Manager for decision diagrams.
@@ -613,7 +614,7 @@ class DDEvaluator(Evaluator):
         )
         result = self.semiring.result(literal_result, self.formula)
         return result
-    
+
     def query(self, node):
         return self.evaluate(node)
 
@@ -676,7 +677,7 @@ def build_dd(source, destination, **kwdargs):
 
         for name, node, label in source.get_names_with_label():
             destination.add_name(name, node, label)
-        
+
         # Copy constraints
         for c in source.constraints():
             destination.add_constraint(c.copy(translate))
