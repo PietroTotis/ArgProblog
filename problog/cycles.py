@@ -92,7 +92,6 @@ def break_cycles(source, target, translation=None, **kwdargs):
                 target.add_name(q, newnode, target.LABEL_EVIDENCE_MAYBE)
 
         logger.debug("Ground program size: %s", len(target))
-        print(target)
         return target
 
 
@@ -210,7 +209,6 @@ def break_neg_cycles(source, target, translation=None, **kwdargs):
         content = set()
         if translation is None:
             translation = defaultdict(list)
-
         for q, n, l in source.labeled():
             newnode, todo_broken, visited = _break_neg_cycles(
                 source, target, n, [], None, content, translation
@@ -218,7 +216,8 @@ def break_neg_cycles(source, target, translation=None, **kwdargs):
             content |= visited
             target.add_name(q, newnode, l)
         for l, id in source.evidence():
-            target.add_evidence(name=l, key=abs(id), value=(id > 0))
+            new_id, _, _ = translation[id]
+            target.add_evidence(name=l, key=new_id, value=(id > 0))
         # print(target.to_prolog())
         # print(target)
         return target
@@ -361,14 +360,12 @@ def _break_neg_cycles(
         translation[nodeid] = (newnode, broken_cycles, content)
 
         # print("\t",nodeid, constraints, broken_cycles)
-
         for k in constraints:  # add all the iff constraints involving newnode
             c1 = target.add_and([newnode, k])
             c2 = target.add_and([-newnode, -k])
             c = target.add_or([c1, c2], name=Term(f"iff_{newnode}_{k}"))
             target.add_cycle_constraint(TrueConstraint(c))
 
-        # print(content, cycles_broken)
         if negative_node:
             return target.negate(newnode), broken_cycles, content
         else:

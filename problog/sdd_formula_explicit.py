@@ -48,9 +48,9 @@ except Exception as err:
 
 class SDDExplicit(SDD):
     """
-        This formula is using the cnf-encoding (c :- a,b = {c,a,b} v {-c,(-a v -b)}). This implies there is an
-        indicator variable for each derived literal and the circuit consists of a single root node on which we do WMC.
-        Evidence and querying is done by modifying the weights.
+    This formula is using the cnf-encoding (c :- a,b = {c,a,b} v {-c,(-a v -b)}). This implies there is an
+    indicator variable for each derived literal and the circuit consists of a single root node on which we do WMC.
+    Evidence and querying is done by modifying the weights.
     """
 
     transform_preference = 11
@@ -70,7 +70,7 @@ class SDDExplicit(SDD):
         return SDDExplicitEvaluator(self, semiring, weights, **kwargs)
 
     def get_root_inode(self):
-        """ Get the current root inode. This includes the constraints. """
+        """Get the current root inode. This includes the constraints."""
         if self._root is None:
             self._root = self.get_manager().true()
         return self._root
@@ -142,6 +142,7 @@ class SDDExplicit(SDD):
             merge_leafs=merge_leafs,
         )
 
+
 class SDDExplicitManager(SDDManager):
     """
     Manager for SDDs with one root which use the explicit encoding, for example where c :- a,b is represented as
@@ -160,7 +161,11 @@ class SDDExplicitManager(SDDManager):
         :type var_constraint: x_constrained
         """
         SDDManager.__init__(
-            self, varcount=varcount, auto_gc=auto_gc, var_constraint=var_constraint, vtree=vtree
+            self,
+            varcount=varcount,
+            auto_gc=auto_gc,
+            var_constraint=var_constraint,
+            vtree=vtree,
         )
         self._x_node = None
         # print(self.get_manager().vtree().dot())
@@ -188,7 +193,9 @@ class SDDExplicitManager(SDDManager):
     def get_x_node(self):
         if self._x_node is None:
             vtree = self.get_manager().vtree()
-            x_constrained = {i for i in range(0,len(self.x_constraint)) if self.x_constraint[i]}
+            x_constrained = {
+                i for i in range(0, len(self.x_constraint)) if self.x_constraint[i]
+            }
             x_node, _ = self._get_x_node(vtree, x_constrained)
             self._x_node = x_node
         return self._x_node
@@ -225,7 +232,7 @@ class SDDExplicitManager(SDDManager):
         def func_weightedmodelcounting(
             node, rvalues, expected_prime_vars, expected_sub_vars
         ):
-            """ Method to pass on to SddIterator's ``depth_first`` to perform weighted model counting."""
+            """Method to pass on to SddIterator's ``depth_first`` to perform weighted model counting."""
             if rvalues is None:
                 # Leaf
                 if node.is_true():
@@ -297,10 +304,10 @@ class SDDExplicitManager(SDDManager):
 
                 normalization = semiring.one()
                 if node.vtree().position() == self.get_x_node():
-                    mc_decision =  node.model_count()
-                    normalization = semiring.value(1/mc_decision)
+                    mc_decision = node.model_count()
+                    normalization = semiring.value(1 / mc_decision)
                     # print(node, node.vtree().position(), mc_decision)
-                
+
                 result_weight = None
                 for prime_weight, sub_weight, prime_vars, sub_vars in rvalues:
                     branch_weight = semiring.times(prime_weight, sub_weight)
@@ -335,7 +342,13 @@ class SDDExplicitManager(SDDManager):
 class SDDExplicitEvaluator(SDDEvaluator):
     def __init__(self, formula, semiring, weights=None, **kwargs):
         SDDEvaluator.__init__(self, formula, semiring, weights, **kwargs)
-        # print(self.formula.sdd_to_dot(self.formula.get_manager().cycle_constraint_dd, litnamemap=self.formula.lnm, show_id=True))
+        # print(
+        #     self.formula.sdd_to_dot(
+        #         self.formula.get_manager().cycle_constraint_dd,
+        #         litnamemap=self.formula.lnm,
+        #         show_id=True,
+        #     )
+        # )
 
     def propagate(self):
         self._initialize()
@@ -347,7 +360,6 @@ class SDDExplicitEvaluator(SDDEvaluator):
             self._evidence_weight = self._evaluate_root()
             if self.semiring.is_zero(self._evidence_weight):
                 raise InconsistentEvidenceError(context=" during compilation")
-        # print("Ev weight", self._evidence_weight)
         return self._evidence_weight
 
     def evaluate_fact(self, node):
@@ -386,7 +398,10 @@ class SDDExplicitEvaluator(SDDEvaluator):
 
             # print("result: %s" % result)
             # print("normalization: %s" % self._get_z())
-            # print("normalizing %s with %s and result before %s" % (normalize, self._get_z(), result))
+            # print(
+            #     "normalizing %s with %s and result before %s"
+            #     % (node, self._get_z(), result)
+            # )
             if normalize:
                 result = self.semiring.normalize(result, self._get_z())
             # print("normalized result: %s" % result)
@@ -399,10 +414,12 @@ class SDDExplicitEvaluator(SDDEvaluator):
         Evaluate the circuit (root node) with the current weights (self.weights)
         :return: The WMC of the circuit with the current weights
         """
+
         pr_semiring = isinstance(
             self.semiring, (SemiringLogProbability, SemiringProbability)
         )
         query_def_inode = self.formula.get_root_inode()
+        # print(self.weights)
         return self._get_manager().wmc(
             query_def_inode,
             self.weights,
@@ -430,16 +447,19 @@ class SDDExplicitEvaluator(SDDEvaluator):
             self.set_weight(index, self.semiring.zero(), neg)
 
     def query(self, index):
-        if len(list(self.evidence()))==0:
+        if len(list(self.evidence())) == 0:
             root_weight = self._get_z()
             inconsistent_weight = self.semiring.negate(root_weight)
             true_weight = self.evaluate(index)
-            false_weight = self.semiring.negate(self.semiring.plus(inconsistent_weight,true_weight))
+            false_weight = self.semiring.negate(
+                self.semiring.plus(inconsistent_weight, true_weight)
+            )
             return (true_weight, false_weight, inconsistent_weight)
         else:
             true_weight = self.evaluate(index)
             false_weight = self.semiring.negate(true_weight)
             return (true_weight, false_weight, self.semiring.zero())
+
 
 x_constrained_named = namedtuple(
     "x_constrained", "X_named"
@@ -465,13 +485,13 @@ def build_explicit_from_logicdag(source, destination, **kwdargs):
     # Get init varcount
     init_varcount = kwdargs.get("init_varcount", -1)
     var_constraint_named = kwdargs.get("var_constraint", None)
-    
+
     vcn = []
     for _, clause, c_type in source:
         if c_type == "atom":
             if type(clause.probability) != bool:
                 vcn.append(clause.name)
-    var_constraint_named =  x_constrained_named(vcn)
+    var_constraint_named = x_constrained_named(vcn)
 
     if var_constraint_named is not None and isinstance(
         var_constraint_named, x_constrained_named
@@ -622,13 +642,18 @@ def build_explicit_from_logicdag(source, destination, **kwdargs):
         else:
             root_key = None
 
-        rename = {n:node_to_indicator[line_map[n][2]] for n in line_map if line_map[n][2] in node_to_indicator}
+        rename = {
+            n: node_to_indicator[line_map[n][2]]
+            for n in line_map
+            if line_map[n][2] in node_to_indicator
+        }
         # Copy constraints
         for c in source.constraints():
             destination.add_constraint(c.copy(rename))
         for c in source.cycle_constraints():
             destination.add_cycle_constraint(c.copy(rename))
 
+        # print(destination)
         destination.build_dd(root_key)
 
     return destination

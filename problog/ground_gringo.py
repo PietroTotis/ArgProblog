@@ -363,7 +363,9 @@ class SmodelsParser:
                     # prob = self.gringo_facts[literal]
                     n = self.gringo_facts_counter[gid]
                     name = Term(t.functor + f"_{n}")
-                    id = logic_graph.add_atom(t.with_args(n), t.probability, name=name)
+                    id = logic_graph.add_atom(
+                        t.with_args(n).with_probability(), t.probability, name=name
+                    )
                     self.gringo_facts_counter[gid] += 1
                 else:
                     id = logic_graph.get_node_by_name(literal.with_probability())

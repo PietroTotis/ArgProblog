@@ -881,7 +881,6 @@ x_constrained = namedtuple(
 
 class SDDEvaluator(DDEvaluator):
     def __init__(self, formula, semiring, weights=None, **kwargs):
-        print(formula)
         DDEvaluator.__init__(self, formula, semiring, weights, **kwargs)
 
     def evaluate_custom(self, node):

@@ -26,13 +26,14 @@ from __future__ import print_function
 import sys
 import os
 from collections import namedtuple
+
 # sys.path.append(os.path.join(os.path.dirname(__file__), 'aspmc'))
 # from .aspmc.aspmc.compile.vtree import Vtree as aspmc_Vtree
 # from .aspmc.aspmc.compile.cnf import CNF as aspmc_CNF
-# from .aspmc.aspmc.compile.constrained_compile import tree_from_cnf 
+# from .aspmc.aspmc.compile.constrained_compile import tree_from_cnf
 from aspmc.compile.vtree import Vtree as aspmc_Vtree
 from aspmc.compile.cnf import CNF as aspmc_CNF
-from aspmc.compile.constrained_compile import tree_from_cnf 
+from aspmc.compile.constrained_compile import tree_from_cnf
 
 from .formula import LogicDAG, LogicFormula
 from .core import transform
@@ -46,6 +47,7 @@ from .sdd_formula import SDDManager
 from .sdd_formula_explicit import SDDExplicit, SDDExplicitManager, x_constrained_named
 from .cnf_formula import CNF
 from .logic import Term
+
 try:
     from pysdd.sdd import Vtree
 except Exception as err:
@@ -56,26 +58,30 @@ from .util import mktempfile
 
 # noinspection PyBroadException
 
+
 class SDDExplicitDefined(SDDExplicit):
     """
-        This formula is using the cnf-encoding (c :- a,b = {c,a,b} v {-c,(-a v -b)}). This implies there is an
-        indicator variable for each derived literal and the circuit consists of a single root node on which we do WMC.
-        Evidence and querying is done by modifying the weights.
+    This formula is using the cnf-encoding (c :- a,b = {c,a,b} v {-c,(-a v -b)}). This implies there is an
+    indicator variable for each derived literal and the circuit consists of a single root node on which we do WMC.
+    Evidence and querying is done by modifying the weights.
     """
 
     def __init__(self, sdd_auto_gc=False, **kwdargs):
         SDDExplicit.__init__(self, sdd_auto_gc=sdd_auto_gc, **kwdargs)
 
-    def _create_manager(self, varcount = 0, var_constraint=None, vtree=None, separator=None):
+    def _create_manager(
+        self, varcount=0, var_constraint=None, vtree=None, separator=None
+    ):
         mgr = SDDExplicitDefinedManager(
             auto_gc=self.auto_gc,
             varcount=varcount,
             var_constraint=var_constraint,
-            vtree = vtree,
-            separator = separator
+            vtree=vtree,
+            separator=separator,
         )
         self.inode_manager = mgr
         return mgr
+
 
 class SDDExplicitDefinedManager(SDDExplicitManager):
     """
@@ -84,7 +90,9 @@ class SDDExplicitDefinedManager(SDDExplicitManager):
     clean_nodes(self, root_inode).
     """
 
-    def __init__(self, varcount=0, var_constraint=None,  auto_gc=False, vtree=None, separator=None):
+    def __init__(
+        self, varcount=0, var_constraint=None, auto_gc=False, vtree=None, separator=None
+    ):
         """Create a new SDDExplicitManager.
 
         :param varcount: number of initial variables
@@ -94,7 +102,13 @@ class SDDExplicitDefinedManager(SDDExplicitManager):
         :param var_constraint: A variable ordering constraint. Currently only x_constrained namedtuple are allowed.
         :type var_constraint: x_constrained
         """
-        SDDExplicitManager.__init__(self, varcount=varcount, auto_gc=auto_gc, var_constraint=var_constraint, vtree=vtree)
+        SDDExplicitManager.__init__(
+            self,
+            varcount=varcount,
+            auto_gc=auto_gc,
+            var_constraint=var_constraint,
+            vtree=vtree,
+        )
         self.separator = separator
 
 
@@ -107,9 +121,9 @@ def dag_to_aspmc_cnf(dag):
     quantify = []
     for i, node, t in dag:
         if t == "atom":
-            if isinstance(node.probability, Term) and  node.probability.is_float():
+            if isinstance(node.probability, Term) and node.probability.is_float():
                 p = node.probability
-                n = 1-node.probability.value # works only with nologspace
+                n = 1 - node.probability.value  # works only with nologspace
                 problog_cnf.add_comment(f"p weight {i} {p};{p}")
                 problog_cnf.add_comment(f"p weight {-i} {n};{n}")
                 quantify.append(str(i))
@@ -128,7 +142,7 @@ def dag_to_aspmc_cnf(dag):
     problog_cnf.add_comment(q_comment)
     problog_cnf.add_comment(s_comment)
     problog_cnf.add_comment("p quantify")
-    problog_cnf.add_comment('p transform lambda w : w[0]/w[1]')
+    problog_cnf.add_comment("p transform lambda w : w[0]/w[1]")
     cnf_file = mktempfile(".cnf")
     # print(problog_cnf.to_dimacs())
     with open(cnf_file, "w") as f:
@@ -136,6 +150,7 @@ def dag_to_aspmc_cnf(dag):
     aspmc_cnf = aspmc_CNF(path=cnf_file)
     # print(aspmc_cnf)
     return aspmc_cnf
+
 
 def aspmc_vtree_to_pysdd_vtree(aspmc_vtree):
     """
@@ -175,9 +190,9 @@ def build_explicit_from_logicdag(source, destination, **kwdargs):
 
     destination._create_manager(
         varcount=pysdd_vtree.var_count(),
-        var_constraint= x_constrained(X=var_ids), 
-        vtree=pysdd_vtree, 
-        separator=sep
+        var_constraint=x_constrained(X=var_ids),
+        vtree=pysdd_vtree,
+        separator=sep,
     )
 
     with Timer("Compiling %s" % destination.__class__.__name__):
@@ -290,7 +305,11 @@ def build_explicit_from_logicdag(source, destination, **kwdargs):
         else:
             root_key = None
 
-        rename = {n:node_to_indicator[line_map[n][2]] for n in line_map if line_map[n][2] in node_to_indicator}
+        rename = {
+            n: node_to_indicator[line_map[n][2]]
+            for n in line_map
+            if line_map[n][2] in node_to_indicator
+        }
         # Copy constraints
         for c in source.constraints():
             destination.add_constraint(c.copy(rename))
@@ -299,9 +318,9 @@ def build_explicit_from_logicdag(source, destination, **kwdargs):
 
         destination.build_dd(root_key)
 
-
     # print("--------")
     # print(destination)
+    # print(destination._weights)
     # print(destination.sdd_to_dot(None, show_id=True))
 
     return destination

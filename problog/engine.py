@@ -257,11 +257,13 @@ class GringoEngine(GenericEngine):
             None,
             **kwdargs,
         )
-        
+
         smodels = SmodelsParser(
             ground_smodels, target=target, queries=queries, evidence=evidence, **kwdargs
         )
         ground_program = smodels.smodels2internal()
+
+        # print(ground_program)
 
         return ground_program
 
