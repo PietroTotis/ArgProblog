@@ -200,7 +200,7 @@ def break_neg_cycles(source, target, translation=None, **kwdargs):
     :return: target
     """
     logger = logging.getLogger("problog")
-    # print(source)
+    print(source)
     # print(source.to_prolog())
     # print("*********")
     target.vtree = source.vtree
@@ -215,8 +215,8 @@ def break_neg_cycles(source, target, translation=None, **kwdargs):
             )
             content |= visited
             target.add_name(q, newnode, l)
-        for l, id in source.evidence():
-            new_id, _, _ = translation[id]
+        for l, id in source.evidence():  #
+            new_id, _, _ = translation[abs(id)]
             target.add_evidence(name=l, key=new_id, value=(id > 0))
         # print(target.to_prolog())
         # print(target)
@@ -239,7 +239,7 @@ def _break_neg_cycles(
     node = source.get_node(nodeid)
     nodetype = type(node).__name__
 
-    # print(nodeid, nodetype, ancestors)
+    print(nodeid, nodetype, ancestors)
 
     if nodeid in ancestors:
         """
